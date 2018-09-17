@@ -33,7 +33,6 @@ public class MoveSystem : JobComponentSystem
     }
 
     [Inject] PlayerData m_data;
-    // Use this for initialization
     protected override JobHandle OnUpdate(JobHandle inputDeps)
     {
         NativeArray<Position> posArr = new NativeArray<Position>(m_data.Length, Allocator.Temp);

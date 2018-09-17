@@ -31,9 +31,7 @@ public class SwarmSystem : JobComponentSystem
         [ReadOnly] public ComponentDataArray<Velocity> velocity;        
         [ReadOnly] public float3 targetPosition;
 
-        public float3 alignment;
-        public float3 cohesion;
-        
+        [WriteOnly] public NativeArray<float3> result;
         public void Execute()
         {
             float3 alignment = float3.zero;
@@ -47,6 +45,9 @@ public class SwarmSystem : JobComponentSystem
 
             alignment /= (float)Length;
             cohesion /= (float)Length;
+
+            result[0] = alignment;
+            result[1] = cohesion;
         }
     }
 
@@ -69,17 +70,17 @@ public class SwarmSystem : JobComponentSystem
         {            
             float3 align = alignment - velocity;
             float3 center = cohesion - position;
-            float3 follow = target - position;
+            float3 seek = target - position;
             float3 separation = float3.zero;
 
-            float distSQ = math.lengthsq(follow);
+            float distSQ = math.lengthsq(seek);
             float sepDistSQ = separationDist * separationDist;
             if(distSQ < sepDistSQ)
             {
-                follow = float3.zero;
+                separation = -seek * sepDistSQ / distSQ;
             }
 
-            return align + center + separation + follow * 2.0f;
+            return align + center + separation + .5f * seek;
         }
 
         public void Execute(int i)
@@ -99,14 +100,17 @@ public class SwarmSystem : JobComponentSystem
     [Inject] PikminData _pikminData;
     protected override JobHandle OnUpdate(JobHandle inputDeps)
     {
+        NativeArray<float3> result = new NativeArray<float3>(2, Allocator.TempJob);
         var SwarmControllerJob = new CalculateSwarmVelocityJob
         {
             Length = _pikminData.Length,
             position = _pikminData.position,
             velocity = _pikminData.velocity,
             targetPosition = _playerData.position[0].Value,
+            result = result
         };
         var jobHandler = SwarmControllerJob.Schedule(inputDeps);
+        jobHandler.Complete();
 
         var flockJob = new FlockJob
         {
@@ -114,13 +118,14 @@ public class SwarmSystem : JobComponentSystem
             pikPosition = _pikminData.position,
             pikVelocity = _pikminData.velocity,
             target = _playerData.position[0].Value,
-            alignment = SwarmControllerJob.alignment,
-            cohesion = SwarmControllerJob.cohesion,
+            alignment = result[0],
+            cohesion = result[1],
             separationDist = 10.0f,
             minVel = 2.5f,
             maxVel = 5.0f,
             deltaT = Time.deltaTime
         };
+        result.Dispose();
         return flockJob.Schedule(_pikminData.Length, 64, jobHandler);        
     }
 }
