@@ -35,7 +35,7 @@ public class SwarmSystem : JobComponentSystem
         public void Execute()
         {
             float3 alignment = float3.zero;
-            float3 cohesion = float3.zero;
+            float3 cohesion = targetPosition;
 
             for(int i = 0; i < Length; i++)
             {
@@ -44,8 +44,7 @@ public class SwarmSystem : JobComponentSystem
             }
 
             alignment /= (float)Length;
-            cohesion /= (float)Length;
-
+            cohesion /= (float)Length + 1.0f;
             result[0] = alignment;
             result[1] = cohesion;
         }
@@ -77,15 +76,15 @@ public class SwarmSystem : JobComponentSystem
             float sepDistSQ = separationDist * separationDist;
             if(distSQ < sepDistSQ)
             {
-                separation = -seek * sepDistSQ / distSQ;
+                separation = -seek;
             }
 
-            return align + center + separation + .5f * seek;
+            return align + center + separation;
         }
 
         public void Execute(int i)
         {            
-            float3 newVel = pikVelocity[i].Value + CalcVelocity(pikPosition[i].Value, pikVelocity[i].Value) * deltaT;
+            float3 newVel = math.lerp(pikVelocity[i].Value, CalcVelocity(pikPosition[i].Value, pikVelocity[i].Value), math.exp(-24.0f * deltaT));
             float speed = math.lengthsq(newVel);
             if (speed > maxVel * maxVel)
                 newVel = math.normalize(newVel) * maxVel;
@@ -121,8 +120,8 @@ public class SwarmSystem : JobComponentSystem
             alignment = result[0],
             cohesion = result[1],
             separationDist = 10.0f,
-            minVel = 2.5f,
-            maxVel = 5.0f,
+            minVel = 25.0f,
+            maxVel = 50.0f,
             deltaT = Time.deltaTime
         };
         result.Dispose();
