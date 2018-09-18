@@ -65,26 +65,48 @@ public class SwarmSystem : JobComponentSystem
         [ReadOnly] public float maxVel;
 
         [ReadOnly] public float deltaT;
-        private float3 CalcVelocity(float3 position, float3 velocity)
+        [ReadOnly] public float swarmRotSpeed;
+        private float3 CalcVelocity(float3 position, float3 velocity, int index)
         {            
             float3 align = alignment - velocity;
             float3 center = cohesion - position;
             float3 seek = target - position;
             float3 separation = float3.zero;
 
-            float distSQ = math.lengthsq(seek);
-            float sepDistSQ = separationDist * separationDist;
-            if(distSQ < sepDistSQ)
+            int count = 0;
+            for(int i = 0; i < Length; i++)
             {
-                separation = -seek;
+                if (i == index) continue;
+                if (math.distance(position, pikPosition[i].Value) <= separationDist)
+                {
+                    separation += position - pikPosition[i].Value;
+                    count++;
+                }
             }
 
-            return align + center + separation;
+            if(count > 0)
+                separation /= (float)count;
+
+            float distSQ = math.lengthsq(seek);
+            float sepDistSQ = separationDist * separationDist;
+
+            //if (distSQ < sepDistSQ)
+            //{
+            //    separation = -seek * (sepDistSQ / distSQ) * .5f;
+            //    separation = math.clamp(separation, 1.0f, 1.5f);
+            //    separation = float3.zero;
+            //}
+
+            var settings = Bootstrap.settings;
+            return settings._alignWeight* align + 
+                    settings._cohesionWeight * center +
+                    settings._separationWeight * separation + 
+                    settings._seekWeight * seek;
         }
 
         public void Execute(int i)
-        {            
-            float3 newVel = math.lerp(pikVelocity[i].Value, CalcVelocity(pikPosition[i].Value, pikVelocity[i].Value), math.exp(-24.0f * deltaT));
+        {
+            float3 newVel = math.lerp(pikVelocity[i].Value, CalcVelocity(pikPosition[i].Value, pikVelocity[i].Value, i), math.exp(-swarmRotSpeed * deltaT));
             float speed = math.lengthsq(newVel);
             if (speed > maxVel * maxVel)
                 newVel = math.normalize(newVel) * maxVel;
@@ -119,10 +141,11 @@ public class SwarmSystem : JobComponentSystem
             target = _playerData.position[0].Value,
             alignment = result[0],
             cohesion = result[1],
-            separationDist = 10.0f,
+            separationDist = 1.0f,
             minVel = 25.0f,
             maxVel = 50.0f,
-            deltaT = Time.deltaTime
+            deltaT = Time.deltaTime,
+            swarmRotSpeed = Bootstrap.settings._swarmRotationSpeed
         };
         result.Dispose();
         return flockJob.Schedule(_pikminData.Length, 64, jobHandler);        
