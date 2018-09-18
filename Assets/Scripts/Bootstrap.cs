@@ -31,7 +31,8 @@ public class Bootstrap
         pikminArch = entityManager.CreateArchetype(
             typeof(Pikmin),
             typeof(Velocity),
-            typeof(Position));
+            typeof(Position),
+            typeof(Rotation));
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
