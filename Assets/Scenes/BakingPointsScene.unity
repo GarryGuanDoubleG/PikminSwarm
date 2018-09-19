@@ -167,7 +167,7 @@ MonoBehaviour:
   rootObject: {fileID: 82638054}
   gridCellObject: {fileID: 114445599776690574, guid: 10875d5fdfdcefd489f31ccd32607800,
     type: 2}
-  gridCellSize: {x: 0.25, y: 0.25, z: 0.25}
+  gridCellSize: {x: 0.5, y: 0.5, z: 0.5}
   bakedPoints: {fileID: 4900000, guid: 05846ee94d0de364897e9b0ec8ef8750, type: 3}
   generateGrid: 1
   path: Assets/Data/

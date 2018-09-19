@@ -30,6 +30,7 @@ public class SpawnSystem : ComponentSystem
             entityManager.SetComponentData(pikminArr[i], new Position { Value = new float3(math.cos(rad), rand.NextFloat(-1.0f, 1.0f), math.sin(rad)) * distance});
             entityManager.SetComponentData(pikminArr[i], new Velocity { Value = float3.zero });
             entityManager.SetComponentData(pikminArr[i], new Scale { Value = new float3(.3f) });
+            entityManager.AddComponent(pikminArr[i], typeof(SwarmFlockFormation));
             entityManager.AddSharedComponentData(pikminArr[i], pikminLook[(i % Bootstrap.settings._pikminLook.Count)].Value);
         }
         entityManager.DestroyEntity(pikmin);

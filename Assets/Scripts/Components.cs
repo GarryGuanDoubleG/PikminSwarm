@@ -10,5 +10,9 @@ public struct Velocity :IComponentData
     public float3 Value;
 }
 
+public struct TargetComponent : IComponentData{ }
 public struct Player : IComponentData { }
 public struct Pikmin : IComponentData { }
+
+public struct SwarmModelFormation : IComponentData { }
+public struct SwarmFlockFormation : IComponentData { }

@@ -6,5 +6,6 @@ using UnityEngine;
 public class MeshGrid
 {
     public List<Vector3> points;
+    public Vector3 cellSize;
     //TODO assign points to bones
 }

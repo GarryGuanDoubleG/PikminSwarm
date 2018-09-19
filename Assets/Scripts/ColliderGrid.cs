@@ -15,7 +15,12 @@ public class ColliderGrid : MonoBehaviour {
 
     private Dictionary<Vector3, BoxCollider> grid;
     private List<ColliderCell> cellList;
-    private List<Vector3> pointsList;
+
+    List<Vector3> pointsList;
+    public List<Vector3> PointList
+    {
+        get { return pointsList; }
+    }
 
     public TextAsset bakedPoints;
     public MeshGrid meshGrid;
@@ -32,14 +37,16 @@ public class ColliderGrid : MonoBehaviour {
 
     // Use this for initialization
     void Start() {
-        transform.position = Vector3.zero;
-        transform.localScale = Vector3.one;
 
        if(bakedPoints == null || generateGrid)
-        {            
+        {
+            transform.position = Vector3.zero;
+            transform.localScale = Vector3.one;
+
             GenerateGrid();
             meshGrid = new MeshGrid();
-            meshGrid.points = pointsList;
+            meshGrid.points = PointList;
+            meshGrid.cellSize = gridCellSize;
 
             string json = JsonUtility.ToJson(meshGrid);
             StreamWriter writer = new StreamWriter(path + name, false);
@@ -49,10 +56,12 @@ public class ColliderGrid : MonoBehaviour {
        else
         {
             meshGrid = JsonUtility.FromJson<MeshGrid>(bakedPoints.text);
+            gridCellSize = meshGrid.cellSize;
             pointsList = meshGrid.points;
-            GameObject[] gameObjArr = new GameObject[pointsList.Count];
+
+            GameObject[] gameObjArr = new GameObject[PointList.Count];            
             int count = 0;
-            foreach (var point in pointsList)
+            foreach (var point in PointList)
             {
                 GameObject cell = Instantiate(gridCellObject.gameObject, rootObject.transform);
                 gameObjArr[count] = cell;
@@ -97,7 +106,7 @@ public class ColliderGrid : MonoBehaviour {
                         ColliderCell cellCollider = cell.GetComponent<ColliderCell>();
                         cellCollider.cellCollider.size = gridCellSize;
                         cellList.Add(cell.GetComponent<ColliderCell>());
-                        pointsList.Add(pos);
+                        PointList.Add(pos);
                         count++;
                     }
                 }
