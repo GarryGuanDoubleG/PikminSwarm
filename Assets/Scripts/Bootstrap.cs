@@ -12,10 +12,7 @@ public class Bootstrap
     public static Settings settings;
 
     public static EntityArchetype playerArch;
-    public static EntityArchetype pikminArch;    
-
-    public static MeshInstanceRenderer playerLook;
-    public static MeshInstanceRenderer pikminLook;    
+    public static EntityArchetype pikminArch;     
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public static void Init()
@@ -32,20 +29,19 @@ public class Bootstrap
             typeof(Pikmin),
             typeof(Velocity),
             typeof(Position),
-            typeof(Rotation));
+            typeof(Rotation),
+            typeof(Scale));
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     public static void InitializeWithScene()
     {
         var entityManager = World.Active.GetOrCreateManager<EntityManager>();
-        playerLook = GetLookFromPrototype("playerLook");
-        pikminLook = GetLookFromPrototype("pikminLook");
 
         Entity player = entityManager.CreateEntity(playerArch);
         entityManager.SetComponentData(player, new Rotation { });
         entityManager.SetComponentData(player, new Position { Value = new float3(0, 1.0f, 0) });
-        entityManager.AddSharedComponentData(player, playerLook);
+        entityManager.AddSharedComponentData(player, settings._playerLook.Value);
     }
 
     public static MeshInstanceRenderer GetLookFromPrototype(string protoName)

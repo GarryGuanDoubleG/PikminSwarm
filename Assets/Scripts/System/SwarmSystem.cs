@@ -8,7 +8,11 @@ using Unity.Mathematics;
 using Unity.Jobs;
 
 public class SwarmSystem : JobComponentSystem
-{    
+{
+    [Inject] PlayerData _playerData;
+    [Inject] PikminData _pikminData;
+    SwarmData _swarmData;
+
     struct PikminData
     {
         public readonly int Length;
@@ -128,16 +132,26 @@ public class SwarmSystem : JobComponentSystem
             else if (speed < minVel * minVel)
                 newVel = dir * minVel;
 
-            float3 newDir = Quaternion.Euler(90.0f, 0, 0) * dir;//make the head face the direction
-            
+            //float3 newDir = Quaternion.Euler(90.0f, 0, 0) * dir;//make the head face the direction
+            float3 up = math.up();
+            float3 right = math.cross(dir, up);
+            up = math.cross(dir, right);
+            float3 newDir = Quaternion.FromToRotation(up, dir) * dir; // get the top of the capsule to face the flying direction
+
             pikVelocity[i] = new Velocity { Value = newVel };
             pikRotation[i] = new Rotation { Value = Quaternion.LookRotation(newDir, dir) };
         }
     }
 
-    [Inject] PlayerData _playerData;
-    [Inject] PikminData _pikminData;
-    SwarmData _swarmData;
+    protected override void OnStopRunning()
+    {
+        base.OnStopRunning();
+        _swarmData.alignArr.Dispose();
+        _swarmData.cohesionArr.Dispose();
+        _swarmData.separationArr.Dispose();
+    }
+
+
     protected override JobHandle OnUpdate(JobHandle inputDeps)
     {
         int pikCount = _pikminData.Length;

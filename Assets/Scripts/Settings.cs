@@ -2,9 +2,16 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Entities;
+using Unity.Transforms;
+using Unity.Rendering;
+
 public class Settings : MonoBehaviour {
 
     public int _spawnCount;
+
+    [Header("Prefabs")]
+    public List<MeshInstanceRendererComponent> _pikminLook;
+    public MeshInstanceRendererComponent _playerLook;
 
     [Header("Boid Flocking Weights")]
     public float _alignWeight;
