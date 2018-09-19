@@ -7,7 +7,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-public class Bootstrap
+public class Bootstrap : MonoBehaviour
 {
     public static Settings settings;
 
@@ -18,7 +18,11 @@ public class Bootstrap
     public static void Init()
     {
         settings = GameObject.FindObjectOfType<Settings>();
-
+        if (settings == null)
+        {
+            World.Active.Dispose();
+            return;
+        }
         var entityManager = World.Active.GetOrCreateManager<EntityManager>();
         playerArch = entityManager.CreateArchetype(
             typeof(Player),
@@ -36,6 +40,8 @@ public class Bootstrap
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     public static void InitializeWithScene()
     {
+        if (World.Active == null)
+            return;
         var entityManager = World.Active.GetOrCreateManager<EntityManager>();
 
         Entity player = entityManager.CreateEntity(playerArch);

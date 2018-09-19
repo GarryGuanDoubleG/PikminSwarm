@@ -25,6 +25,4 @@ public class Settings : MonoBehaviour {
     public float _separationDist;
     public float _minVel;
     public float _maxVel;
-
-
 }
