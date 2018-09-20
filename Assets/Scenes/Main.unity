@@ -206,7 +206,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c46741db88011c4e8a912fce2f8d71c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _spawnCount: 512
+  _spawnCount: 1280
+  _spawnScale:
+    x: 0.1
+    y: 0.1
+    z: 0.1
   _pikminLook:
   - {fileID: 114156454311559514, guid: 79fcadd9519edb141949503943cc7712, type: 2}
   - {fileID: 114071286906032070, guid: 9524fd03bddc1cc409fe2961692de306, type: 2}
@@ -217,7 +221,7 @@ MonoBehaviour:
   _separationWeight: 5
   _seekWeight: 1
   _swarmRotationSpeed: 78.82
-  _neighborDist: 0.35
+  _neighborDist: 0.1
   _separationDist: -9.7
   _minVel: 25
   _maxVel: 50

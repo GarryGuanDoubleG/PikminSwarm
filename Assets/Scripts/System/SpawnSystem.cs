@@ -29,7 +29,7 @@ public class SpawnSystem : ComponentSystem
             float rad = math.radians(i * (offset + rand.NextFloat(0.0f, 20.0f)));
             entityManager.SetComponentData(pikminArr[i], new Position { Value = new float3(math.cos(rad), rand.NextFloat(-1.0f, 1.0f), math.sin(rad)) * distance});
             entityManager.SetComponentData(pikminArr[i], new Velocity { Value = float3.zero });
-            entityManager.SetComponentData(pikminArr[i], new Scale { Value = new float3(.3f) });
+            entityManager.SetComponentData(pikminArr[i], new Scale { Value = Bootstrap.settings._spawnScale });
             entityManager.AddComponent(pikminArr[i], typeof(SwarmFlockFormation));
             entityManager.AddSharedComponentData(pikminArr[i], pikminLook[(i % Bootstrap.settings._pikminLook.Count)].Value);
         }

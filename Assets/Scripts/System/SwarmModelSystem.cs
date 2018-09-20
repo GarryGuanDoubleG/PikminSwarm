@@ -12,6 +12,9 @@ public class SwarmModelSystem : JobComponentSystem
     [Inject] SwarmData _swarmData;
 
     NativeArray<int> _targetIndices;
+    NativeArray<float3> _targetPoints;
+    ColliderGrid _currentGrid;
+
 	struct SwarmData
     {
         public readonly int Length;
@@ -22,10 +25,9 @@ public class SwarmModelSystem : JobComponentSystem
         public ComponentDataArray<Velocity> velocity;
     }
 
-    struct TargetData
+    struct GridPoints
     {
         public ColliderGrid grid;
-        public TargetComponent target;
     }
 
     struct SwarmMoveJob : IJobParallelFor
@@ -33,8 +35,8 @@ public class SwarmModelSystem : JobComponentSystem
         [ReadOnly] public int Length;
         [ReadOnly] public ComponentDataArray<Position> position;
         [ReadOnly] public NativeArray<int> indices;
-        [ReadOnly] public Vector3 rootPosition;
-        [ReadOnly] public List<Vector3> nodes;
+        [ReadOnly] public NativeArray<float3> meshPoints;
+        [ReadOnly] public float3 rootPosition;        
         [ReadOnly] public float minVel;
         [ReadOnly] public float maxVel;
         [ReadOnly] public float deltaT;
@@ -45,7 +47,7 @@ public class SwarmModelSystem : JobComponentSystem
         public void Execute(int i)
         {
             int targetIndex = indices[i];
-            float3 targetPos = nodes[targetIndex] + rootPosition;
+            float3 targetPos = meshPoints[targetIndex] + rootPosition;
             float3 newVel = math.lerp(velocity[i].Value, targetPos - position[i].Value, math.exp(deltaT));
             float lengthSQ = math.lengthsq(newVel);
             if (lengthSQ < minVel * minVel)
@@ -64,25 +66,47 @@ public class SwarmModelSystem : JobComponentSystem
     {
         base.OnStopRunning();
         _targetIndices.Dispose();
+        _targetPoints.Dispose();
+
     }
 
     protected override JobHandle OnUpdate(JobHandle inputDeps)
     {
-        if(_targetIndices.IsCreated)
-            _targetIndices.Dispose();
+        if (_targetIndices.IsCreated)
+        {
+            _targetIndices.Dispose();            
+        }
         _targetIndices = new NativeArray<int>(_swarmData.Length, Allocator.TempJob);
 
         //TODO work on multiple targets
-        foreach(var entity in GetEntities<GameObject>())
+        foreach(var entity in GetEntities<GridPoints>())
         {
             var grid = entity.grid;
-            int targetNodeCount = grid.PointList.Count;
+            if(grid != _currentGrid)
+            {
+                _currentGrid = grid;
+                if (_targetPoints.IsCreated)
+                    _targetPoints.Dispose();
+                _targetPoints = new NativeArray<float3>(grid.PointList.Count, Allocator.Persistent);
+                int i = 0;
+                foreach(Vector3 point in grid.PointList)
+                {
+                    _targetPoints[i++] = point;
+                }
+            }
+
+            int targetNodeCount = _targetPoints.Length;
             int offset = targetNodeCount / _swarmData.Length;
-            int count = 0;            
+            int count = 0;
+            int swarmAgentCount = _swarmData.Length;
 
             for (int i = 0; i < targetNodeCount; i += offset)
-                _targetIndices[count++] = i;
+            {
+                if (count >= _swarmData.Length)
+                    break;
 
+                _targetIndices[count++] = i;
+            }
             return new SwarmMoveJob
             {
                 Length = _swarmData.Length,
@@ -90,7 +114,7 @@ public class SwarmModelSystem : JobComponentSystem
                 rotation = _swarmData.rotation,
                 velocity = _swarmData.velocity,
                 indices = _targetIndices,
-                nodes = grid.PointList,
+                meshPoints = _targetPoints,
                 rootPosition = grid.gameObject.transform.position,
                 minVel = Bootstrap.settings._minVel,
                 maxVel = Bootstrap.settings._maxVel,

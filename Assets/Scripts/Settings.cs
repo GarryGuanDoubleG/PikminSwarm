@@ -4,10 +4,13 @@ using UnityEngine;
 using Unity.Entities;
 using Unity.Transforms;
 using Unity.Rendering;
+using Unity.Mathematics;
 
 public class Settings : MonoBehaviour {
 
+    [Header("Spawn")]
     public int _spawnCount;
+    public float3 _spawnScale;
 
     [Header("Prefabs")]
     public List<MeshInstanceRendererComponent> _pikminLook;
