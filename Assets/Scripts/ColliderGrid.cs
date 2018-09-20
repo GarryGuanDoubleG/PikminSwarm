@@ -13,7 +13,6 @@ public class ColliderGrid : MonoBehaviour {
     public ColliderCell gridCellObject;
     public Vector3 gridCellSize;
 
-    private Dictionary<Vector3, BoxCollider> grid;
     private List<ColliderCell> cellList;
 
     List<Vector3> pointsList;
@@ -25,12 +24,12 @@ public class ColliderGrid : MonoBehaviour {
     public TextAsset bakedPoints;
     public MeshGrid meshGrid;
     public bool generateGrid;
+    public bool spawnColliderObj;
     public string path;
-    public string name;
+    public string fileName;
     
     private void Awake()
     {
-        grid = new Dictionary<Vector3, BoxCollider>();
         cellList = new List<ColliderCell>();
         pointsList = new List<Vector3>();
     }
@@ -49,7 +48,7 @@ public class ColliderGrid : MonoBehaviour {
             meshGrid.cellSize = gridCellSize;
 
             string json = JsonUtility.ToJson(meshGrid);
-            StreamWriter writer = new StreamWriter(path + name, false);
+            StreamWriter writer = new StreamWriter(path + fileName, false);
             writer.WriteLine(json);
             writer.Close();
         }
@@ -57,9 +56,12 @@ public class ColliderGrid : MonoBehaviour {
         {
             meshGrid = JsonUtility.FromJson<MeshGrid>(bakedPoints.text);
             gridCellSize = meshGrid.cellSize;
-            pointsList = meshGrid.points;
+            pointsList = meshGrid.points;            
+        }
 
-            GameObject[] gameObjArr = new GameObject[PointList.Count];            
+        if (spawnColliderObj)
+        {
+            GameObject[] gameObjArr = new GameObject[PointList.Count];
             int count = 0;
             foreach (var point in PointList)
             {
@@ -72,16 +74,17 @@ public class ColliderGrid : MonoBehaviour {
                 cellList.Add(cell.GetComponent<ColliderCell>());
                 count++;
             }
-        }
-	}
+        }        
+    }
 
     void GenerateGrid()
     {
-        Vector3 size = meshBoxCollider.size + Vector3.one;
-        Vector3 offset = size * .5f;
+        Vector3 boxColliderSize = meshBoxCollider.size;
+        Vector3 worldSize = Vector3.Scale(meshBoxCollider.size, meshBoxCollider.transform.localScale) + Vector3.one;
+        Vector3 offset = worldSize * .5f;
         offset.y = 0.0f;
 
-        Vector3 cellsPerSide = new Vector3(size.x / gridCellSize.x, size.y / gridCellSize.y, size.z / gridCellSize.z);
+        Vector3 cellsPerSide = new Vector3(worldSize.x / gridCellSize.x, worldSize.y / gridCellSize.y, worldSize.z / gridCellSize.z);
         Vector3 halfCellSize = gridCellSize * .5f;
 
         int colliderCount = (int)(cellsPerSide.x * cellsPerSide.y * cellsPerSide.z) + 1;
@@ -149,10 +152,6 @@ public class ColliderGrid : MonoBehaviour {
                 currPoint = cellPoint;
         }
 
-        if(cellPoint == new Vector3(-2.5f, 7.5f, -2.75f))
-        {
-            int a = 100;
-        }
         return !(hitCount % 2 == 0);
 
     }

@@ -25,7 +25,9 @@ public class Settings : MonoBehaviour {
     [Header("Boid Swarm Values")]
     public float _swarmRotationSpeed;
     public float _neighborDist;
-    public float _separationDist;
     public float _minVel;
     public float _maxVel;
+
+    [Header("Boid Swarm Model Formation")]
+    public float _swarmModelStartDelay;
 }

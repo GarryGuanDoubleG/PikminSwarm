@@ -23,7 +23,12 @@ public class SwarmSystem : ComponentSystem
         public EntityArray entityArray;
     }
 
-    
+    protected override void OnStartRunning()
+    {
+        base.OnStartRunning();
+        _timer = Bootstrap.settings._swarmModelStartDelay;
+    }
+
     protected override void OnUpdate()
     {
         _timer -= Time.deltaTime;

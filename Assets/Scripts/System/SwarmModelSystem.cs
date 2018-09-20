@@ -41,13 +41,19 @@ public class SwarmModelSystem : JobComponentSystem
         [ReadOnly] public float maxVel;
         [ReadOnly] public float deltaT;
 
+        [ReadOnly] public float3 rootScale;
+        [ReadOnly] public Quaternion rootRotation;
+
         public ComponentDataArray<Rotation> rotation;
         public ComponentDataArray<Velocity> velocity;
 
         public void Execute(int i)
         {
             int targetIndex = indices[i];
-            float3 targetPos = meshPoints[targetIndex] + rootPosition;
+            float3 targetPos = meshPoints[targetIndex];
+            targetPos = targetPos * rootScale;
+            targetPos = rootRotation * targetPos;            
+            targetPos += rootPosition;
             float3 newVel = math.lerp(velocity[i].Value, targetPos - position[i].Value, math.exp(deltaT));
             float lengthSQ = math.lengthsq(newVel);
             if (lengthSQ < minVel * minVel)
@@ -55,7 +61,7 @@ public class SwarmModelSystem : JobComponentSystem
             else if (lengthSQ > maxVel * maxVel)
                 newVel = maxVel * math.normalize(newVel);
 
-            if (math.distance(targetPos, position[i].Value) < 1.0f)
+            if (math.distance(targetPos, position[i].Value) <= .20f)
                 newVel = float3.zero;
 
             velocity[i] = new Velocity { Value = newVel };
@@ -65,8 +71,11 @@ public class SwarmModelSystem : JobComponentSystem
     protected override void OnStopRunning()
     {
         base.OnStopRunning();
-        _targetIndices.Dispose();
-        _targetPoints.Dispose();
+        if(_targetIndices.IsCreated)
+            _targetIndices.Dispose();
+
+        if (_targetPoints.IsCreated)
+            _targetPoints.Dispose();
 
     }
 
@@ -74,7 +83,7 @@ public class SwarmModelSystem : JobComponentSystem
     {
         if (_targetIndices.IsCreated)
         {
-            _targetIndices.Dispose();            
+            _targetIndices.Dispose();
         }
         _targetIndices = new NativeArray<int>(_swarmData.Length, Allocator.TempJob);
 
@@ -96,9 +105,8 @@ public class SwarmModelSystem : JobComponentSystem
             }
 
             int targetNodeCount = _targetPoints.Length;
-            int offset = targetNodeCount / _swarmData.Length;
+            int offset = (int)math.ceil((float)targetNodeCount / (float)_swarmData.Length);
             int count = 0;
-            int swarmAgentCount = _swarmData.Length;
 
             for (int i = 0; i < targetNodeCount; i += offset)
             {
@@ -116,6 +124,8 @@ public class SwarmModelSystem : JobComponentSystem
                 indices = _targetIndices,
                 meshPoints = _targetPoints,
                 rootPosition = grid.gameObject.transform.position,
+                rootRotation = grid.gameObject.transform.rotation,
+                rootScale = grid.gameObject.transform.localScale,
                 minVel = Bootstrap.settings._minVel,
                 maxVel = Bootstrap.settings._maxVel,
             }.Schedule(_swarmData.Length, 32, inputDeps);

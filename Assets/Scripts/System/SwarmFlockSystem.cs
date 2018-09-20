@@ -46,7 +46,6 @@ public class SwarmFlockSystem : JobComponentSystem
         [ReadOnly] public float3 targetPosition;
 
         [ReadOnly] public float neighborDist;
-        [ReadOnly] public float separationDist;
 
         [WriteOnly] public NativeArray<float3> alignArr;
         [WriteOnly] public NativeArray<float3> cohesArr;
@@ -95,7 +94,6 @@ public class SwarmFlockSystem : JobComponentSystem
         [ReadOnly] public NativeArray<float3> separationArr;
 
         [ReadOnly] public float neighborDist;
-        [ReadOnly] public float separationDist;
         [ReadOnly] public float minVel;
         [ReadOnly] public float maxVel;
 
@@ -180,7 +178,6 @@ public class SwarmFlockSystem : JobComponentSystem
             pikVelocity = _pikminData.velocity,
             targetPosition = _playerData.position[0].Value,
             neighborDist = Bootstrap.settings._neighborDist,
-            separationDist = Bootstrap.settings._separationDist,
             alignArr = alignArray,
             cohesArr = cohesionArray,
             separtArr = separationArray
@@ -198,7 +195,6 @@ public class SwarmFlockSystem : JobComponentSystem
             cohesionArr = cohesionArray,
             separationArr = separationArray,
             neighborDist = Bootstrap.settings._neighborDist,
-            separationDist = Bootstrap.settings._separationDist,
             minVel = Bootstrap.settings._minVel,
             maxVel = Bootstrap.settings._maxVel,
             deltaT = Time.deltaTime,
