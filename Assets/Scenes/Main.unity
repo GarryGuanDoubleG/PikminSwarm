@@ -208,9 +208,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _spawnCount: 49000
   _spawnScale:
-    x: 0.65
-    y: 0.65
-    z: 0.65
+    x: 0.5
+    y: 0.5
+    z: 0.5
   _pikminLook:
   - {fileID: 114156454311559514, guid: 79fcadd9519edb141949503943cc7712, type: 2}
   - {fileID: 114071286906032070, guid: 9524fd03bddc1cc409fe2961692de306, type: 2}
@@ -276,6 +276,10 @@ Prefab:
     - target: {fileID: 4209010035061028, guid: 401a15e38d2ad114f8de6b69b37ff338, type: 2}
       propertyPath: m_RootOrder
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1880955289393198, guid: 401a15e38d2ad114f8de6b69b37ff338, type: 2}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 401a15e38d2ad114f8de6b69b37ff338, type: 2}
