@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [SerializeField]
-public class MeshGrid
+public class MeshGridData
 {
     public List<Vector3> points;
     public Vector3 cellSize;

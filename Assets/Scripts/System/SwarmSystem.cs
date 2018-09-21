@@ -10,7 +10,7 @@ using Unity.Jobs;
 public class SwarmSystem : ComponentSystem
 {
     [Inject] PikminData _pikminData;
-    float _timer = 3.0f;
+    float _modelFormationTimer;
 
     struct PikminData
     {
@@ -26,13 +26,13 @@ public class SwarmSystem : ComponentSystem
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
-        _timer = Bootstrap.settings._swarmModelStartDelay;
+        _modelFormationTimer = Bootstrap.settings._swarmModelStartDelay;
     }
 
     protected override void OnUpdate()
     {
-        _timer -= Time.deltaTime;
-        if (_timer <= 0.0f)
+        _modelFormationTimer -= Time.deltaTime;
+        if (_modelFormationTimer <= 0.0f)
         {
             var entityArr = _pikminData.entityArray;
             for(int i = 0; i < _pikminData.Length; i++)
