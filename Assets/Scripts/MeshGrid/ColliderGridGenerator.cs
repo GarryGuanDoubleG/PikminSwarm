@@ -12,6 +12,9 @@ public class ColliderGridGenerator : MonoBehaviour
 
     public GameObject _rootObject;
     public GameObject _rootMesh;
+    public GameObject _armatureRoot;
+    private List<Transform> _boneList;
+    private List<int> _boneIndices;
 
     public ColliderCell _gridCellObject;
     public Vector3 _gridCellSize;
@@ -24,7 +27,15 @@ public class ColliderGridGenerator : MonoBehaviour
         private set { _pointsList = value; }
     }
 
+    List<Vector3> _pointBoneOffsetList;
+    public List<Vector3> OffsetList
+    {
+        get { return _pointBoneOffsetList; }
+        private set { _pointBoneOffsetList = value; }
+    }
+
     public int _maxHitCount;
+    public bool _generateGrid;    
     public bool _multiDirectionalCheck;
     public MeshGridData _meshGridData;
 
@@ -34,51 +45,53 @@ public class ColliderGridGenerator : MonoBehaviour
 
     private void Awake()
     {
-        _cellList = new List<ColliderCell>();
-        _pointsList = new List<Vector3>();
     }
 
     // Use this for initialization
     void Start()
     {
+        _cellList = new List<ColliderCell>();
+        _pointsList = new List<Vector3>();
+        _boneList = new List<Transform>();
+
+        GetBoneList(_armatureRoot.transform);
+
         transform.position = Vector3.zero;
         transform.localScale = Vector3.one;
 
-        GenerateGrid();
-        if (_multiDirectionalCheck)
+        if (_generateGrid)
         {
-            List<Vector3> checkPointList = new List<Vector3>(_pointsList.Count);
-            foreach (Vector3 point in PointList)
+            GenerateGrid();
+            GetPointBones();
+
+            _meshGridData = new MeshGridData();
+            _meshGridData.offsets = _pointBoneOffsetList;
+            _meshGridData.cellSize = _gridCellSize;
+            _meshGridData.boneIndices = _boneIndices;
+
+            SpawnColliders();            
+
+            if (_writeToFile)
             {
-                if (IsInsideTest(point, -Vector3.forward))
-                    checkPointList.Add(point);
+                string json = JsonUtility.ToJson(_meshGridData);
+                StreamWriter writer = new StreamWriter(_path + _fileName, false);
+                writer.WriteLine(json);
+                writer.Close();
+            }            
+        }
+    }
+
+    void GetBoneList(Transform transform)
+    {
+        int childCount = transform.childCount;
+        for(int i = 0; i < childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (child != null)
+            {
+                _boneList.Add(child);
+                GetBoneList(child);
             }
-            PointList = checkPointList;
-        }
-        _meshGridData = new MeshGridData();
-        _meshGridData.points = PointList;
-        _meshGridData.cellSize = _gridCellSize;
-
-        if (_writeToFile)
-        {
-            string json = JsonUtility.ToJson(_meshGridData);
-            StreamWriter writer = new StreamWriter(_path + _fileName, false);
-            writer.WriteLine(json);
-            writer.Close();
-        }
-
-        GameObject[] gameObjArr = new GameObject[PointList.Count];
-        int count = 0;
-        foreach (var point in PointList)
-        {
-            GameObject cell = Instantiate(_gridCellObject.gameObject, _rootObject.transform);
-            gameObjArr[count] = cell;
-            cell.transform.localPosition = point;
-
-            ColliderCell cellCollider = cell.GetComponent<ColliderCell>();
-            cellCollider.cellCollider.size = _gridCellSize;
-            _cellList.Add(cell.GetComponent<ColliderCell>());
-            count++;
         }
     }
 
@@ -108,7 +121,41 @@ public class ColliderGridGenerator : MonoBehaviour
                     }
                 }
             }
+        }
 
+        if (_multiDirectionalCheck)
+            ReverseCollisionCheck();
+    }
+
+    //find which bones to attach each point to
+    void GetPointBones()
+    {
+        _boneIndices = new List<int>(_pointsList.Count);
+        _pointBoneOffsetList = new List<Vector3>(_pointsList.Count);
+        for(int i = 0; i < _pointsList.Count; i++)
+        {
+            float minDistSQ = 99999.0f;
+            int boneIndex = 0;
+            int minBoneIndex = -1;
+            Vector3 point = _pointsList[i];
+            foreach(var trans in _boneList)
+            {
+                Vector3 bonePos = trans.position;
+                Vector3 distance = point - bonePos;
+                float distSQ = Vector3.Dot(distance, distance);
+                if (distSQ < minDistSQ)
+                {
+                    minBoneIndex = boneIndex;
+                    minDistSQ = distSQ;
+                }
+                boneIndex++;
+            }
+
+            Vector3 bonePosition = _boneList[minBoneIndex].transform.position;
+            Vector3 offset = _pointsList[i] - bonePosition;
+
+            _pointBoneOffsetList.Add(offset);
+            _boneIndices.Add(minBoneIndex);
         }
     }
 
@@ -150,6 +197,34 @@ public class ColliderGridGenerator : MonoBehaviour
 
         return (hitCount % 2) != 0 && hitCount <= _maxHitCount;
 
+    }
+
+    void SpawnColliders()
+    {
+        GameObject[] gameObjArr = new GameObject[PointList.Count];
+        int count = 0;
+        foreach (var point in PointList)
+        {
+            GameObject cell = Instantiate(_gridCellObject.gameObject, _rootObject.transform);
+            gameObjArr[count] = cell;
+            cell.transform.localPosition = point;
+
+            ColliderCell cellCollider = cell.GetComponent<ColliderCell>();
+            cellCollider.cellCollider.size = _gridCellSize;
+            _cellList.Add(cell.GetComponent<ColliderCell>());
+            count++;
+        }
+    }
+
+    void ReverseCollisionCheck()
+    {
+        List<Vector3> checkPointList = new List<Vector3>(_pointsList.Count);
+        foreach (Vector3 point in PointList)
+        {
+            if (IsInsideTest(point, -Vector3.forward))
+                checkPointList.Add(point);
+        }
+        PointList = checkPointList;
     }
 
     // Update is called once per frame

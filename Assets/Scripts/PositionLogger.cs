@@ -16,6 +16,6 @@ public class PositionLogger : MonoBehaviour {
         //Debug.Log("rotation: " + transform.rotation);
         //Debug.Log("scale: " + transform.localScale);
         _cubeTest.transform.position = transform.position;
-        _cubeTest.transform.rotation = transform.rotation;
+        //_cubeTest.transform.rotation = transform.rotation;
     }
 }
