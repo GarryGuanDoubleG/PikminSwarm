@@ -347,6 +347,41 @@ Prefab:
       propertyPath: m_Size.z
       value: 0.37
       objectReference: {fileID: 0}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _rootArmature
+      value: 
+      objectReference: {fileID: 182758189}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _isRiggedMesh
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _generateGrid
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _multiDirectionalCheck
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _isSkinnedMesh
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _showPoints
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 114717196702426448, guid: 9fba8cafde06e344a934ed8d55f3d318,
+        type: 2}
+      propertyPath: _skinnedMeshCollider
+      value: 
+      objectReference: {fileID: 182758192}
     m_RemovedComponents:
     - {fileID: 64435122999890088, guid: 9fba8cafde06e344a934ed8d55f3d318, type: 2}
     - {fileID: 137370457583367664, guid: 9fba8cafde06e344a934ed8d55f3d318, type: 2}
@@ -356,6 +391,16 @@ Prefab:
 --- !u!4 &182758188 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4527557664781504, guid: 9fba8cafde06e344a934ed8d55f3d318,
+    type: 2}
+  m_PrefabInternal: {fileID: 182758187}
+--- !u!1 &182758189 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1382525585781974, guid: 9fba8cafde06e344a934ed8d55f3d318,
+    type: 2}
+  m_PrefabInternal: {fileID: 182758187}
+--- !u!1 &182758190 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1437451585195336, guid: 9fba8cafde06e344a934ed8d55f3d318,
     type: 2}
   m_PrefabInternal: {fileID: 182758187}
 --- !u!1 &182758191 stripped
@@ -368,13 +413,14 @@ MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_GameObject: {fileID: 182758191}
-  m_Enabled: 1
+  m_GameObject: {fileID: 182758190}
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ce7f2c1f22be3a047aad823df06dbd7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   meshRenderer: {fileID: 182758196}
+  meshCollider: {fileID: 182758193}
 --- !u!64 &182758193
 MeshCollider:
   m_ObjectHideFlags: 0

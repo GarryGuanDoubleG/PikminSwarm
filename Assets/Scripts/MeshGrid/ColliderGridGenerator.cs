@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using Unity.Jobs;
@@ -8,13 +9,18 @@ using System.IO;
 public class ColliderGridGenerator : MonoBehaviour
 {
     public MeshCollider _meshCollider;
+    public SkinnedMeshCollider _skinnedMeshCollider;
     public BoxCollider[] _meshBoxColliderArr;
 
     public GameObject _rootObject;
     public GameObject _rootMesh;
-    public GameObject _armatureRoot;
+    public GameObject _rootArmature;
+
     private List<Transform> _boneList;
-    private List<int> _boneIndices;
+    private Dictionary<Transform, int> _boneIndexMap;
+    private Dictionary<Transform, List<int>> _connectedBoneMap; //bones with the same parent that affect bone position
+    //private List<int> _boneIndices;
+    private List<BoneGridCell> _pointBoneWeights;
 
     public ColliderCell _gridCellObject;
     public Vector3 _gridCellSize;
@@ -35,7 +41,9 @@ public class ColliderGridGenerator : MonoBehaviour
     }
 
     public int _maxHitCount;
-    public bool _generateGrid;    
+    public bool _isSkinnedMesh;
+    public bool _generateGrid;
+    public bool _showPoints;
     public bool _multiDirectionalCheck;
     public MeshGridData _meshGridData;
 
@@ -45,6 +53,17 @@ public class ColliderGridGenerator : MonoBehaviour
 
     private void Awake()
     {
+        transform.position = Vector3.zero;
+        transform.rotation = Quaternion.identity;
+        transform.localScale = Vector3.one;
+
+        if (_isSkinnedMesh)
+        {
+            if (_skinnedMeshCollider == null)
+                Debug.LogError("Must Place Skin Mesh Collider");
+
+            _skinnedMeshCollider.RecalculateMeshCollider();
+        }
     }
 
     // Use this for initialization
@@ -53,35 +72,41 @@ public class ColliderGridGenerator : MonoBehaviour
         _cellList = new List<ColliderCell>();
         _pointsList = new List<Vector3>();
         _boneList = new List<Transform>();
+        _boneIndexMap = new Dictionary<Transform, int>();
+        _connectedBoneMap = new Dictionary<Transform, List<int>>();
+        _pointBoneWeights = new List<BoneGridCell>();
 
-        GetBoneList(_armatureRoot.transform);
-
-        transform.position = Vector3.zero;
-        transform.localScale = Vector3.one;
+        if (_isSkinnedMesh)
+        {
+            GetBonesList(_rootArmature.transform);
+            GetConnectedBones(_rootArmature.transform);
+        }
 
         if (_generateGrid)
         {
             GenerateGrid();
-            GetPointBones();
 
-            _meshGridData = new MeshGridData();
-            _meshGridData.offsets = _pointBoneOffsetList;
-            _meshGridData.cellSize = _gridCellSize;
-            _meshGridData.boneIndices = _boneIndices;
-
-            SpawnColliders();            
-
-            if (_writeToFile)
-            {
-                string json = JsonUtility.ToJson(_meshGridData);
-                StreamWriter writer = new StreamWriter(_path + _fileName, false);
-                writer.WriteLine(json);
-                writer.Close();
-            }            
+            if (_isSkinnedMesh) GetPointBones();
+            if (_writeToFile) WriteToFile();
+            if(_showPoints) SpawnColliders();
         }
     }
 
-    void GetBoneList(Transform transform)
+    void WriteToFile()
+    {
+        _meshGridData = new MeshGridData();
+        _meshGridData.isRigged = _isSkinnedMesh;
+        _meshGridData.cellSize = _gridCellSize;
+        _meshGridData.points = _isSkinnedMesh ? null : _pointsList;
+        _meshGridData.pointBones = _isSkinnedMesh ? _pointBoneWeights : null;
+
+        string json = JsonUtility.ToJson(_meshGridData);
+        StreamWriter writer = new StreamWriter(_path + _fileName, false);
+        writer.WriteLine(json);
+        writer.Close();
+    }
+
+    void GetBonesList(Transform transform)
     {
         int childCount = transform.childCount;
         for(int i = 0; i < childCount; i++)
@@ -89,12 +114,65 @@ public class ColliderGridGenerator : MonoBehaviour
             Transform child = transform.GetChild(i);
             if (child != null)
             {
+                _boneIndexMap.Add(child, _boneList.Count);
                 _boneList.Add(child);
-                GetBoneList(child);
+                GetBonesList(child);
             }
         }
     }
 
+    //parse bone names too see if they match
+    string [] GetTokens(Transform trans)
+    {
+        //TODO name splitArr a public var
+        string input = trans.name;
+        char[] splitArr = new char[] { '_' };
+        string inputName = new string(input.Where(c => c != '-' && (c < '0' || c > '9')).ToArray()); //get rid of numbers
+        return inputName.Split(splitArr);
+    }
+
+    //compare bone names for all matching tokens and same parent
+    void GetConnectedBones(Transform currBone)
+    {
+        int childCount = currBone.childCount;
+        if (childCount == 0)
+            return;
+        
+        Transform[] children = new Transform[currBone.childCount];
+        for (int i = 0; i < childCount; i++)
+        {
+            Transform child = currBone.GetChild(i);
+            if (child != null)
+            {
+                GetConnectedBones(child);
+                children[i] = child;
+            }
+        }
+
+        for(int i = 0; i < childCount; i++)
+        {
+            Transform child = children[i];
+            if (child == null)
+                continue;
+
+            string[] currTokens = GetTokens(child);
+            List<int> connectedBoneIndices = new List<int>();
+
+            for (int j = 0; j < childCount; j++)
+            {
+                if (j == i || children[j] == null)
+                    continue;
+                Transform otherChild = children[j];
+                string[] otherTokens = GetTokens(otherChild);
+
+                if (currTokens.SequenceEqual(otherTokens))
+                    connectedBoneIndices.Add(_boneIndexMap[otherChild]);
+            }
+            _connectedBoneMap.Add(child, connectedBoneIndices);            
+        }
+    }
+    
+    //TODO make another option to use octrees
     void GenerateGrid()
     {
         Vector3 scale = _rootMesh.transform.localScale;
@@ -127,38 +205,75 @@ public class ColliderGridGenerator : MonoBehaviour
             ReverseCollisionCheck();
     }
 
+    Transform GetClosestBone(Vector3 point)
+    {
+        float minDistSQ = 99999f;
+        Transform closest = null;
+        foreach (var trans in _boneList)
+        {
+            Vector3 bonePos = trans.position;
+            Vector3 distance = point - bonePos;
+            float distSQ = Vector3.Dot(distance, distance);
+            if (distSQ < minDistSQ)
+            {
+                closest = trans;
+                minDistSQ = distSQ;
+            }
+        }
+
+        return closest;
+    }
+    
     //find which bones to attach each point to
     void GetPointBones()
     {
-        _boneIndices = new List<int>(_pointsList.Count);
+        //_boneIndices = new List<int>(_pointsList.Count);
         _pointBoneOffsetList = new List<Vector3>(_pointsList.Count);
         for(int i = 0; i < _pointsList.Count; i++)
         {
-            float minDistSQ = 99999.0f;
-            int boneIndex = 0;
-            int minBoneIndex = -1;
             Vector3 point = _pointsList[i];
-            foreach(var trans in _boneList)
+            Transform closestBone = GetClosestBone(point);
+            List<int> connectedBones = _connectedBoneMap[closestBone];
+            float[] weights = new float[connectedBones.Count + 1];
+            int[] boneIndices = new int[connectedBones.Count + 1];
+            boneIndices[0] = _boneIndexMap[closestBone];
+
+            if (connectedBones.Count == 0)
             {
-                Vector3 bonePos = trans.position;
-                Vector3 distance = point - bonePos;
-                float distSQ = Vector3.Dot(distance, distance);
-                if (distSQ < minDistSQ)
-                {
-                    minBoneIndex = boneIndex;
-                    minDistSQ = distSQ;
-                }
-                boneIndex++;
+                weights[0] = 1.0f;                
+                _pointBoneWeights.Add(new BoneGridCell { position = point - closestBone.position, weights = weights, boneIndices = boneIndices });
             }
+            else
+            {
+                float totalDistance = Vector3.Distance(closestBone.position, point);
+                Vector3 weighedPosition = Vector3.zero;
+                weights[0] = totalDistance;
 
-            Vector3 bonePosition = _boneList[minBoneIndex].transform.position;
-            Vector3 offset = _pointsList[i] - bonePosition;
+                for (int j = 0; j < connectedBones.Count; j++)
+                {
+                    int index = connectedBones[j];
+                    float distance = Vector3.Distance(point, _boneList[index].position);
+                    totalDistance += distance;
+                    weights[j + 1] = distance;
+                    boneIndices[j + 1] = index;
+                }
+                
+                for (int j = 0; j < weights.Length; j++)
+                {
+                    int boneIndex = boneIndices[j];
+                    weights[j] = (totalDistance - weights[j]) / totalDistance;
+                    weights[j] /= weights.Length - 1;
+                    weighedPosition += _boneList[boneIndex].position * weights[j];
+                }
 
-            _pointBoneOffsetList.Add(offset);
-            _boneIndices.Add(minBoneIndex);
+                Vector3 offset = point - weighedPosition;
+                _pointBoneWeights.Add(new BoneGridCell { position = offset, weights = weights, boneIndices = boneIndices });
+            }
         }
     }
 
+    //basicallly do a raycast in a single direction and see how many times you hit the mesh
+    //then do it again back to the cell point to get any back facing meshes
     public bool IsInsideTest(Vector3 cellPoint, Vector3 goalDir)
     {
         int hitCount = 0;
@@ -170,8 +285,6 @@ public class ColliderGridGenerator : MonoBehaviour
         float hitPointOffset = 0.1f;
 
         RaycastHit hit;
-        //basicallly do a raycast in a single direction and see how many times you hit the mesh
-        //then do it again back to the cell point to get any back facing meshes
 
         while (currPoint != goal && hitCount <= _maxHitCount)
         {
@@ -196,7 +309,6 @@ public class ColliderGridGenerator : MonoBehaviour
 
 
         return (hitCount % 2) != 0 && hitCount <= _maxHitCount;
-
     }
 
     void SpawnColliders()

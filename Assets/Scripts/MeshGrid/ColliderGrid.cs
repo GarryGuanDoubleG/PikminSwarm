@@ -9,6 +9,8 @@ public class ColliderGrid : MonoBehaviour
     public GameObject rootObject;
     public GameObject rootMesh;
     public Transform rootArmature;
+    private bool _isSkinnedMesh;
+    public bool IsSkinnedMesh{ get { return _isSkinnedMesh; }}
 
     List<Transform> _boneList;
     public List<Transform> BoneList
@@ -17,8 +19,15 @@ public class ColliderGrid : MonoBehaviour
         private set { _boneList = value; }
     }
 
-    List<Vector3> _bonePointList;
-    public List<Vector3> BonePointList
+    List<Vector3> _pointList;
+    public List<Vector3> PointList
+    {
+        get { return _pointList; }
+        private set { _pointList = value; }
+    }
+
+    List<BoneGridCell> _bonePointList;
+    public List<BoneGridCell> BonePointList
     {
         get { return _bonePointList; }
         private set { _bonePointList = value; }
@@ -46,8 +55,9 @@ public class ColliderGrid : MonoBehaviour
             Debug.LogError("Baked points cannot be empty");
 
         MeshGridData meshGrid = JsonUtility.FromJson<MeshGridData>(bakedPoints.text);
-        _bonePointList = meshGrid.offsets;
-        _boneIndexList = meshGrid.boneIndices;
+        _isSkinnedMesh = meshGrid.isRigged;      
+        _bonePointList = meshGrid.pointBones;
+        _pointList = meshGrid.points;        
     }
 
     void GetBoneList(Transform transform)
