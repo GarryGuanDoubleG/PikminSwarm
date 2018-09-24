@@ -110,7 +110,8 @@ public class ColliderGridGenerator : MonoBehaviour
     void GetBonesList(Transform transform)
     {
         int i = 0;
-        foreach (Transform bone in _skinnedMeshRenderer.bones)
+        Transform[] bones = _skinnedMeshRenderer.bones;        
+        foreach (Transform bone in bones)
         {
             _boneList.Add(bone);
             _boneIndexMap.Add(bone, i++);
@@ -251,7 +252,7 @@ public class ColliderGridGenerator : MonoBehaviour
         Mesh mesh = _skinnedMeshRenderer.sharedMesh;
         Vector3 [] vertices = mesh.vertices;
         BoneWeight[] boneWeights = mesh.boneWeights;
-
+        Vector3 scale = _skinnedMeshRenderer.transform.localScale;
         for (int i = 0; i < _pointsList.Count; i++)
         {
             Vector3 point = _pointsList[i];
@@ -259,7 +260,7 @@ public class ColliderGridGenerator : MonoBehaviour
             int index = -1;
             for(int j = 0; j < vertices.Length; j++)
             {
-                Vector3 vertex = vertices[j];
+                Vector3 vertex = Vector3.Scale(scale, vertices[j]);
                 float distSQ = Vector3.SqrMagnitude(vertex - point);
                 if (distSQ < minDistSQ)
                 {

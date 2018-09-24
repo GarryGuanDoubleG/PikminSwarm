@@ -121,21 +121,32 @@ public class SwarmModelSystem : JobComponentSystem
             weighedPoint += boneCell.weight2 * bonePositions[boneCell.boneIndex2];
             weighedPoint += boneCell.weight3 * bonePositions[boneCell.boneIndex3];
 
+            gridPoint = rootRotation * gridPoint;
             weighedOffset += boneCell.weight0 * (float3)(boneRotations[boneCell.boneIndex0] * gridPoint);
             weighedOffset += boneCell.weight1 * (float3)(boneRotations[boneCell.boneIndex1] * gridPoint);
             weighedOffset += boneCell.weight2 * (float3)(boneRotations[boneCell.boneIndex2] * gridPoint);
             weighedOffset += boneCell.weight3 * (float3)(boneRotations[boneCell.boneIndex3] * gridPoint);
-         
+
             targetPos = weighedPoint + weighedOffset;
-
-            float3 newVel = math.lerp(velocity[index].Value, targetPos - position[index].Value, math.exp(deltaT));
-            float lengthSQ = math.lengthsq(newVel);
-            if (lengthSQ < minVel * minVel)
-                newVel = minVel * math.normalize(newVel);
-            else if (lengthSQ > maxVel * maxVel)
-                newVel = maxVel * math.normalize(newVel);
-
             position[index] = new Position { Value = targetPos };
+            //if (math.length(targetPos - position[index].Value) <= .2f)
+            //{
+            //    position[index] = new Position { Value = targetPos };
+            //    velocity[index] = new Velocity { Value = float3.zero };
+            //}
+            //else
+            //{
+            //    //float3 newVel = math.lerp(velocity[index].Value, targetPos - position[index].Value, .5f);
+            //    float3 newVel = targetPos - position[index].Value;
+            //    float lengthSQ = math.lengthsq(newVel);
+            //    if (lengthSQ < minVel * minVel)
+            //        newVel = minVel * math.normalize(newVel);
+            //    else if (lengthSQ > maxVel * maxVel)
+            //        newVel = maxVel * math.normalize(newVel);
+
+            //    velocity[index] = new Velocity { Value = newVel };
+            //}
+
         }
     }
 
@@ -188,14 +199,18 @@ public class SwarmModelSystem : JobComponentSystem
             _boneInverseBaseRotations = new NativeArray<Quaternion>(grid.BoneList.Count, Allocator.Persistent);
 
             Mesh mesh = grid._skinnedMeshRenderer.sharedMesh;
+            BoneWeight [] weights = mesh.boneWeights;
+            List<int> boneWeightIndices = grid.BoneWeightIndices;
             for (int i = 0; i < grid.BoneWeightIndices.Count; i++)
             {
-                int index = grid.BoneWeightIndices[i];
-                _boneWeights[i] = mesh.boneWeights[index];
+                int index = boneWeightIndices[i];
+                _boneWeights[i] = weights[index];
             }
+            grid._skinnedMeshRenderer.sharedMesh = null;
 
             for (int i = 0; i < grid.BoneList.Count; i++)
                 _boneInverseBaseRotations[i] = Quaternion.Inverse(grid.BoneList[i].rotation);
+            
 
         }
         else if(_bonePositions.IsCreated)

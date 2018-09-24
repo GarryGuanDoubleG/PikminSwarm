@@ -78,7 +78,8 @@ public class ColliderGrid : MonoBehaviour
 
     void GetBoneList()
     {
-        foreach(Transform trans in _skinnedMeshRenderer.bones)        
-            _boneList.Add(trans);
+        Transform[] bones = _skinnedMeshRenderer.bones;
+        foreach (Transform bone in bones)        
+            _boneList.Add(bone);
     }
 }
