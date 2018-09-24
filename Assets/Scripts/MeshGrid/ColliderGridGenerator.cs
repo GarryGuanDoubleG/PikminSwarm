@@ -10,6 +10,7 @@ public class ColliderGridGenerator : MonoBehaviour
 {
     public MeshCollider _meshCollider;
     public SkinnedMeshCollider _skinnedMeshCollider;
+    public SkinnedMeshRenderer _skinnedMeshRenderer;
     public BoxCollider[] _meshBoxColliderArr;
 
     public GameObject _rootObject;
@@ -20,7 +21,7 @@ public class ColliderGridGenerator : MonoBehaviour
     private Dictionary<Transform, int> _boneIndexMap;
     private Dictionary<Transform, List<int>> _connectedBoneMap; //bones with the same parent that affect bone position
     //private List<int> _boneIndices;
-    private List<BoneGridCell> _pointBoneWeights;
+    private List<int> _boneWeightIndices;
 
     public ColliderCell _gridCellObject;
     public Vector3 _gridCellSize;
@@ -74,19 +75,19 @@ public class ColliderGridGenerator : MonoBehaviour
         _boneList = new List<Transform>();
         _boneIndexMap = new Dictionary<Transform, int>();
         _connectedBoneMap = new Dictionary<Transform, List<int>>();
-        _pointBoneWeights = new List<BoneGridCell>();
+        _boneWeightIndices = new List<int>();
 
         if (_isSkinnedMesh)
         {
             GetBonesList(_rootArmature.transform);
-            GetConnectedBones(_rootArmature.transform);
+            //GetConnectedBones(_rootArmature.transform);
         }
 
         if (_generateGrid)
         {
             GenerateGrid();
 
-            if (_isSkinnedMesh) GetPointBones();
+            if (_isSkinnedMesh) FindBoneWeightsFromPoint();
             if (_writeToFile) WriteToFile();
             if(_showPoints) SpawnColliders();
         }
@@ -97,8 +98,8 @@ public class ColliderGridGenerator : MonoBehaviour
         _meshGridData = new MeshGridData();
         _meshGridData.isRigged = _isSkinnedMesh;
         _meshGridData.cellSize = _gridCellSize;
-        _meshGridData.points = _isSkinnedMesh ? null : _pointsList;
-        _meshGridData.pointBones = _isSkinnedMesh ? _pointBoneWeights : null;
+        _meshGridData.points = _pointsList;
+        _meshGridData.boneWeightIndices = _isSkinnedMesh ? _boneWeightIndices : null;
 
         string json = JsonUtility.ToJson(_meshGridData);
         StreamWriter writer = new StreamWriter(_path + _fileName, false);
@@ -108,17 +109,24 @@ public class ColliderGridGenerator : MonoBehaviour
 
     void GetBonesList(Transform transform)
     {
-        int childCount = transform.childCount;
-        for(int i = 0; i < childCount; i++)
+        int i = 0;
+        foreach (Transform bone in _skinnedMeshRenderer.bones)
         {
-            Transform child = transform.GetChild(i);
-            if (child != null)
-            {
-                _boneIndexMap.Add(child, _boneList.Count);
-                _boneList.Add(child);
-                GetBonesList(child);
-            }
+            _boneList.Add(bone);
+            _boneIndexMap.Add(bone, i++);
         }
+
+        //int childCount = transform.childCount;
+        //for(int i = 0; i < childCount; i++)
+        //{
+        //    Transform child = transform.GetChild(i);
+        //    if (child != null)
+        //    {
+        //        _boneIndexMap.Add(child, _boneList.Count);
+        //        _boneList.Add(child);
+        //        GetBonesList(child);
+        //    }
+        //}
     }
 
     //parse bone names too see if they match
@@ -134,41 +142,54 @@ public class ColliderGridGenerator : MonoBehaviour
     //compare bone names for all matching tokens and same parent
     void GetConnectedBones(Transform currBone)
     {
-        int childCount = currBone.childCount;
-        if (childCount == 0)
-            return;
-        
-        Transform[] children = new Transform[currBone.childCount];
-        for (int i = 0; i < childCount; i++)
+        foreach(Transform bone in _boneList)
         {
-            Transform child = currBone.GetChild(i);
-            if (child != null)
+            string[] tokens = GetTokens(bone);
+            List<int> indices = new List<int>();
+            Transform parent = bone.parent;
+            Vector3 pos = bone.position;
+
+            float minDist1 = 9999,
+                    minDist2 = 9999,
+                    minDist3 = 9999;
+            Transform bone1 = null,
+                      bone2 = null,
+                      bone3 = null;
+            
+            foreach(Transform other in _boneList)
             {
-                GetConnectedBones(child);
-                children[i] = child;
+                if (other != bone)
+                {
+                    float dist = Vector3.Distance(other.position, pos);
+                    if(dist < minDist1)
+                    {
+                        bone3 = bone2;
+                        bone2 = bone1;
+                        bone1 = other;    
+                        
+                        minDist3 = minDist2;
+                        minDist2 = minDist1;
+                        minDist1 = dist;
+                    }
+                    else if(dist < minDist2)
+                    {
+                        bone3 = bone2;
+                        bone2 = other;
+                        minDist3 = minDist2;
+                        minDist2 = dist;
+                    }
+                    else if(dist < minDist3)
+                    {
+                        bone3 = other;
+                        minDist3 = dist;
+                    }
+                }
             }
-        }
+            indices.Add(_boneIndexMap[bone1]);
+            indices.Add(_boneIndexMap[bone2]);
+            indices.Add(_boneIndexMap[bone3]);
 
-        for(int i = 0; i < childCount; i++)
-        {
-            Transform child = children[i];
-            if (child == null)
-                continue;
-
-            string[] currTokens = GetTokens(child);
-            List<int> connectedBoneIndices = new List<int>();
-
-            for (int j = 0; j < childCount; j++)
-            {
-                if (j == i || children[j] == null)
-                    continue;
-                Transform otherChild = children[j];
-                string[] otherTokens = GetTokens(otherChild);
-
-                if (currTokens.SequenceEqual(otherTokens))
-                    connectedBoneIndices.Add(_boneIndexMap[otherChild]);
-            }
-            _connectedBoneMap.Add(child, connectedBoneIndices);            
+            _connectedBoneMap.Add(bone, indices);
         }
     }
     
@@ -225,50 +246,36 @@ public class ColliderGridGenerator : MonoBehaviour
     }
     
     //find which bones to attach each point to
-    void GetPointBones()
+    void FindBoneWeightsFromPoint()
     {
-        //_boneIndices = new List<int>(_pointsList.Count);
-        _pointBoneOffsetList = new List<Vector3>(_pointsList.Count);
-        for(int i = 0; i < _pointsList.Count; i++)
+        Mesh mesh = _skinnedMeshRenderer.sharedMesh;
+        Vector3 [] vertices = mesh.vertices;
+        BoneWeight[] boneWeights = mesh.boneWeights;
+
+        for (int i = 0; i < _pointsList.Count; i++)
         {
             Vector3 point = _pointsList[i];
-            Transform closestBone = GetClosestBone(point);
-            List<int> connectedBones = _connectedBoneMap[closestBone];
-            float[] weights = new float[connectedBones.Count + 1];
-            int[] boneIndices = new int[connectedBones.Count + 1];
-            boneIndices[0] = _boneIndexMap[closestBone];
-
-            if (connectedBones.Count == 0)
+            float minDistSQ = 9999f;
+            int index = -1;
+            for(int j = 0; j < vertices.Length; j++)
             {
-                weights[0] = 1.0f;                
-                _pointBoneWeights.Add(new BoneGridCell { position = point - closestBone.position, weights = weights, boneIndices = boneIndices });
-            }
-            else
-            {
-                float totalDistance = Vector3.Distance(closestBone.position, point);
-                Vector3 weighedPosition = Vector3.zero;
-                weights[0] = totalDistance;
-
-                for (int j = 0; j < connectedBones.Count; j++)
+                Vector3 vertex = vertices[j];
+                float distSQ = Vector3.SqrMagnitude(vertex - point);
+                if (distSQ < minDistSQ)
                 {
-                    int index = connectedBones[j];
-                    float distance = Vector3.Distance(point, _boneList[index].position);
-                    totalDistance += distance;
-                    weights[j + 1] = distance;
-                    boneIndices[j + 1] = index;
+                    index = j;
+                    minDistSQ = distSQ;
                 }
-                
-                for (int j = 0; j < weights.Length; j++)
-                {
-                    int boneIndex = boneIndices[j];
-                    weights[j] = (totalDistance - weights[j]) / totalDistance;
-                    weights[j] /= weights.Length - 1;
-                    weighedPosition += _boneList[boneIndex].position * weights[j];
-                }
-
-                Vector3 offset = point - weighedPosition;
-                _pointBoneWeights.Add(new BoneGridCell { position = offset, weights = weights, boneIndices = boneIndices });
             }
+            Vector3 weighedPoint = Vector3.zero;
+            BoneWeight bW = boneWeights[index];
+            weighedPoint += bW.weight0 * _boneList[bW.boneIndex0].position;
+            weighedPoint += bW.weight1 * _boneList[bW.boneIndex1].position;
+            weighedPoint += bW.weight2 * _boneList[bW.boneIndex2].position;
+            weighedPoint += bW.weight3 * _boneList[bW.boneIndex3].position;
+
+            _pointsList[i] = point - weighedPoint;
+            _boneWeightIndices.Add(index);
         }
     }
 

@@ -11,6 +11,7 @@ public class ColliderGrid : MonoBehaviour
     public Transform rootArmature;
     private bool _isSkinnedMesh;
     public bool IsSkinnedMesh{ get { return _isSkinnedMesh; }}
+    public SkinnedMeshRenderer _skinnedMeshRenderer;
 
     List<Transform> _boneList;
     public List<Transform> BoneList
@@ -26,11 +27,11 @@ public class ColliderGrid : MonoBehaviour
         private set { _pointList = value; }
     }
 
-    List<BoneGridCell> _bonePointList;
-    public List<BoneGridCell> BonePointList
+    List<int> _boneWeightIndices;
+    public List<int> BoneWeightIndices
     {
-        get { return _bonePointList; }
-        private set { _bonePointList = value; }
+        get { return _boneWeightIndices; }
+        private set { _boneWeightIndices = value; }
     }
 
     List<int> _boneIndexList;
@@ -45,7 +46,8 @@ public class ColliderGrid : MonoBehaviour
     private void Awake()
     {
         _boneList = new List<Transform>();
-        GetBoneList(rootArmature);
+        //GetBoneList(rootArmature);
+        GetBoneList();
     }
 
     // Use this for initialization
@@ -56,21 +58,27 @@ public class ColliderGrid : MonoBehaviour
 
         MeshGridData meshGrid = JsonUtility.FromJson<MeshGridData>(bakedPoints.text);
         _isSkinnedMesh = meshGrid.isRigged;      
-        _bonePointList = meshGrid.pointBones;
-        _pointList = meshGrid.points;        
+        _boneWeightIndices = meshGrid.boneWeightIndices;
+        _pointList = meshGrid.points;
     }
 
-    void GetBoneList(Transform transform)
+    //void GetBoneList(Transform transform)
+    //{
+    //    int childCount = transform.childCount;
+    //    for (int i = 0; i < childCount; i++)
+    //    {
+    //        Transform child = transform.GetChild(i);
+    //        if (child != null)
+    //        {
+    //            _boneList.Add(child);
+    //            GetBoneList(child);
+    //        }
+    //    }
+    //}
+
+    void GetBoneList()
     {
-        int childCount = transform.childCount;
-        for (int i = 0; i < childCount; i++)
-        {
-            Transform child = transform.GetChild(i);
-            if (child != null)
-            {
-                _boneList.Add(child);
-                GetBoneList(child);
-            }
-        }
+        foreach(Transform trans in _skinnedMeshRenderer.bones)        
+            _boneList.Add(trans);
     }
 }

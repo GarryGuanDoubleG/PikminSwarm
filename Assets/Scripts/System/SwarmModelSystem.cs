@@ -13,12 +13,11 @@ public class SwarmModelSystem : JobComponentSystem
 
     NativeArray<int> _targetIndices;
     NativeArray<float3> _targetPoints;
-    NativeArray<float3> _bonePositions;
-    NativeArray<BoneCellJobData> _boneGridCells;
+    NativeArray<float3> _bonePositions;    
+    NativeArray<BoneWeight> _boneWeights;
     NativeArray<Quaternion> _boneRotations;
     NativeArray<Quaternion> _boneInverseBaseRotations;
-    
-
+        
     ColliderGrid _currentGrid;
 
 	struct SwarmData
@@ -37,12 +36,12 @@ public class SwarmModelSystem : JobComponentSystem
         public ColliderGrid grid;
     }
 
-    struct BoneCellJobData
-    {
-        public float3 position;
-        public int4 boneIndices;
-        public float4 boneWeights;        
-    }
+    //struct BoneWeight
+    //{
+    //    public float3 position;
+    //    public int4 boneIndices;
+    //    public float4 boneWeights;        
+    //}
 
     struct SwarmModelJob : IJobParallelFor
     {
@@ -94,7 +93,8 @@ public class SwarmModelSystem : JobComponentSystem
         [ReadOnly] public Quaternion rootRotation;
 
         [ReadOnly] public NativeArray<int> targetIndices;
-        [ReadOnly] public NativeArray<BoneCellJobData> boneGridCells;
+        [ReadOnly] public NativeArray<float3> cellPosition;
+        [ReadOnly] public NativeArray<BoneWeight> boneGridCells;
         [ReadOnly] public NativeArray<float3> bonePositions;
         [ReadOnly] public NativeArray<Quaternion> boneRotations;
 
@@ -109,26 +109,23 @@ public class SwarmModelSystem : JobComponentSystem
         public void Execute(int index)
         {
             int targetIndex = targetIndices[index];
-            BoneCellJobData boneCell = boneGridCells[targetIndex];
+            BoneWeight boneCell = boneGridCells[targetIndex];
 
+            float3 gridPoint = cellPosition[targetIndex];
             float3 targetPos = float3.zero;
             float3 weighedPoint = float3.zero;
             float3 weighedOffset = float3.zero;
-            float3 cellBoneOffset = boneCell.position;
-            for (int i = 0; i < 4; i++)
-            {
-                int boneIndex = boneCell.boneIndices[i];
-                if (boneIndex == -1)
-                    break;
 
-                float boneWeight = boneCell.boneWeights[i];                
-                float3 bonePos = bonePositions[boneIndex];
-                Quaternion boneRot = boneRotations[boneIndex];
+            weighedPoint += boneCell.weight0 * bonePositions[boneCell.boneIndex0];
+            weighedPoint += boneCell.weight1 * bonePositions[boneCell.boneIndex1];
+            weighedPoint += boneCell.weight2 * bonePositions[boneCell.boneIndex2];
+            weighedPoint += boneCell.weight3 * bonePositions[boneCell.boneIndex3];
 
-                weighedPoint += boneWeight * bonePos;
-                weighedOffset += boneWeight * (float3)(boneRot * rootRotation * cellBoneOffset);
-            }
-
+            weighedOffset += boneCell.weight0 * (float3)(boneRotations[boneCell.boneIndex0] * gridPoint);
+            weighedOffset += boneCell.weight1 * (float3)(boneRotations[boneCell.boneIndex1] * gridPoint);
+            weighedOffset += boneCell.weight2 * (float3)(boneRotations[boneCell.boneIndex2] * gridPoint);
+            weighedOffset += boneCell.weight3 * (float3)(boneRotations[boneCell.boneIndex3] * gridPoint);
+         
             targetPos = weighedPoint + weighedOffset;
 
             float3 newVel = math.lerp(velocity[index].Value, targetPos - position[index].Value, math.exp(deltaT));
@@ -139,15 +136,6 @@ public class SwarmModelSystem : JobComponentSystem
                 newVel = maxVel * math.normalize(newVel);
 
             position[index] = new Position { Value = targetPos };
-            //velocity[index] = new Velocity { Value = float3.zero };
-
-            //if (math.distance(targetPos, position[index].Value) <= .50f)
-            //{                
-            //    position[index] = new Position { Value = targetPos };
-            //    velocity[index] = new Velocity { Value = float3.zero };
-            //}
-            //else
-            //    velocity[index] = new Velocity { Value = newVel };
         }
     }
 
@@ -169,8 +157,8 @@ public class SwarmModelSystem : JobComponentSystem
         if (_boneInverseBaseRotations.IsCreated)
             _boneInverseBaseRotations.Dispose();
 
-        if(_boneGridCells.IsCreated)
-            _boneGridCells.Dispose();
+        if(_boneWeights.IsCreated)
+            _boneWeights.Dispose();
     }
 
     private void LoadModelFormationData(ColliderGrid grid)
@@ -179,7 +167,7 @@ public class SwarmModelSystem : JobComponentSystem
         if (_targetPoints.IsCreated)
             _targetPoints.Dispose();
 
-        _targetPoints = new NativeArray<float3>(grid.BonePointList.Count, Allocator.Persistent);
+        _targetPoints = new NativeArray<float3>(grid.PointList.Count, Allocator.Persistent);
 
         for (int i = 0; i < grid.PointList.Count; i++)
             _targetPoints[i] = grid.PointList[i];
@@ -189,32 +177,21 @@ public class SwarmModelSystem : JobComponentSystem
     {
         if (grid != _currentGrid)
         {
-            _currentGrid = grid;
-            if (_boneGridCells.IsCreated)
+            LoadModelFormationData(grid);
+            if (_boneWeights.IsCreated)
             {
                 _boneInverseBaseRotations.Dispose();
-                _boneGridCells.Dispose();
+                _boneWeights.Dispose();
             }
 
-            _boneGridCells = new NativeArray<BoneCellJobData>(grid.BonePointList.Count, Allocator.Persistent);
+            _boneWeights = new NativeArray<BoneWeight>(grid.BoneWeightIndices.Count, Allocator.Persistent);
             _boneInverseBaseRotations = new NativeArray<Quaternion>(grid.BoneList.Count, Allocator.Persistent);
 
-            for (int i = 0; i < grid.BonePointList.Count; i++)
+            Mesh mesh = grid._skinnedMeshRenderer.sharedMesh;
+            for (int i = 0; i < grid.BoneWeightIndices.Count; i++)
             {
-                BoneGridCell cell = grid.BonePointList[i];
-                float4 boneWeights = float4.zero;
-                int4 boneIndices = new int4(-1);
-
-                for (int j = 0; j < cell.boneIndices.Length && j < 4; j++)
-                {
-                    boneIndices[j] = cell.boneIndices[j];
-                    boneWeights[j] = cell.weights[j];
-                }
-                _boneGridCells[i] = new BoneCellJobData {
-                    position = (float3)cell.position,
-                    boneWeights = boneWeights,
-                    boneIndices = boneIndices
-                };
+                int index = grid.BoneWeightIndices[i];
+                _boneWeights[i] = mesh.boneWeights[index];
             }
 
             for (int i = 0; i < grid.BoneList.Count; i++)
@@ -257,7 +234,7 @@ public class SwarmModelSystem : JobComponentSystem
             else
                 LoadModelFormationData(grid);
 
-            int targetNodeCount = _currentGrid.IsSkinnedMesh ? _boneGridCells.Length : _targetPoints.Length;
+            int targetNodeCount = _currentGrid.IsSkinnedMesh ? _boneWeights.Length : _targetPoints.Length;
             int offset = (int)math.ceil((float)targetNodeCount / (float)_swarmData.Length);
             int count = 0;
 
@@ -278,7 +255,8 @@ public class SwarmModelSystem : JobComponentSystem
                     rotation = _swarmData.rotation,
                     velocity = _swarmData.velocity,
                     targetIndices = _targetIndices,
-                    boneGridCells = _boneGridCells,
+                    cellPosition = _targetPoints,
+                    boneGridCells = _boneWeights,
                     bonePositions = _bonePositions,
                     boneRotations = _boneRotations,
                     rootPosition = grid.rootArmature.position,
