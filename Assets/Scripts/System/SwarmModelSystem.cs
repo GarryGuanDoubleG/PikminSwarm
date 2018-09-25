@@ -6,6 +6,7 @@ using Unity.Transforms;
 using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Jobs;
+using Unity.Burst;
 
 public class SwarmModelSystem : JobComponentSystem
 {
@@ -13,12 +14,16 @@ public class SwarmModelSystem : JobComponentSystem
 
     NativeArray<int> _targetIndices;
     NativeArray<float3> _targetPoints;
-    NativeArray<float3> _bonePositions;    
+    NativeArray<float3> _bonePositions;
+    NativeArray<float> _randomOffsets;
+    NativeArray<int> _attachedToTarget; //TODO make this into bitarrays
     NativeArray<BoneWeight> _boneWeights;
     NativeArray<Quaternion> _boneRotations;
     NativeArray<Quaternion> _boneInverseBaseRotations;
         
     ColliderGrid _currentGrid;
+
+    float _timer;
 
 	struct SwarmData
     {
@@ -31,17 +36,10 @@ public class SwarmModelSystem : JobComponentSystem
         public ComponentDataArray<Velocity> velocity;
     }
 
-    struct GridPoints
+    struct TargetModel
     {
         public ColliderGrid grid;
     }
-
-    //struct BoneWeight
-    //{
-    //    public float3 position;
-    //    public int4 boneIndices;
-    //    public float4 boneWeights;        
-    //}
 
     struct SwarmModelJob : IJobParallelFor
     {
@@ -93,7 +91,8 @@ public class SwarmModelSystem : JobComponentSystem
         [ReadOnly] public Quaternion rootRotation;
 
         [ReadOnly] public NativeArray<int> targetIndices;
-        [ReadOnly] public NativeArray<float3> cellPosition;
+        [ReadOnly] public NativeArray<float3> cellPosition;        
+        [ReadOnly] public NativeArray<float> randomOffsets;
         [ReadOnly] public NativeArray<BoneWeight> boneGridCells;
         [ReadOnly] public NativeArray<float3> bonePositions;
         [ReadOnly] public NativeArray<Quaternion> boneRotations;
@@ -101,6 +100,16 @@ public class SwarmModelSystem : JobComponentSystem
         [ReadOnly] public float minVel;
         [ReadOnly] public float maxVel;
         [ReadOnly] public float deltaT;
+        [ReadOnly] public float time;
+        [ReadOnly] public float minDistSQ;
+        [ReadOnly] public float swarmTime;
+        [ReadOnly] public float timer;
+        [ReadOnly] public float swarmRotationSpeed;
+        [ReadOnly] public float swarmTimeOffsetFactor;
+        [ReadOnly] public float swarmOffsetDistance;
+        [ReadOnly] public float minSwarmRotationSpeed;
+
+        public NativeArray<int> attachedToTarget;
 
         public ComponentDataArray<Position> position;
         public ComponentDataArray<Rotation> rotation;
@@ -123,31 +132,66 @@ public class SwarmModelSystem : JobComponentSystem
 
             gridPoint = rootRotation * gridPoint;
             weighedOffset += boneCell.weight0 * (float3)(boneRotations[boneCell.boneIndex0] * gridPoint);
-            weighedOffset += boneCell.weight1 * (float3)(boneRotations[boneCell.boneIndex1] * gridPoint);
-            weighedOffset += boneCell.weight2 * (float3)(boneRotations[boneCell.boneIndex2] * gridPoint);
-            weighedOffset += boneCell.weight3 * (float3)(boneRotations[boneCell.boneIndex3] * gridPoint);
+            if (boneCell.weight1 > 0.01f)
+                weighedOffset += boneCell.weight1 * (float3)(boneRotations[boneCell.boneIndex1] * gridPoint);
+            if (boneCell.weight2 > 0.01f)
+                weighedOffset += boneCell.weight2 * (float3)(boneRotations[boneCell.boneIndex2] * gridPoint);
+            if (boneCell.weight3 > 0.01f)
+                weighedOffset += boneCell.weight3 * (float3)(boneRotations[boneCell.boneIndex3] * gridPoint);
 
             targetPos = weighedPoint + weighedOffset;
-            position[index] = new Position { Value = targetPos };
-            //if (math.length(targetPos - position[index].Value) <= .2f)
-            //{
-            //    position[index] = new Position { Value = targetPos };
-            //    velocity[index] = new Velocity { Value = float3.zero };
-            //}
-            //else
-            //{
-            //    //float3 newVel = math.lerp(velocity[index].Value, targetPos - position[index].Value, .5f);
-            //    float3 newVel = targetPos - position[index].Value;
-            //    float lengthSQ = math.lengthsq(newVel);
-            //    if (lengthSQ < minVel * minVel)
-            //        newVel = minVel * math.normalize(newVel);
-            //    else if (lengthSQ > maxVel * maxVel)
-            //        newVel = maxVel * math.normalize(newVel);
+            float3 toRootDir = math.normalize(targetPos - rootPosition);
+            float sinWave = math.clamp(math.sin(swarmTimeOffsetFactor * time), 0, 1.0f);
+            targetPos += toRootDir * randomOffsets[targetIndex] * sinWave * swarmOffsetDistance;
 
-            //    velocity[index] = new Velocity { Value = newVel };
-            //}
+            int attached = attachedToTarget[index];
+            float distanceSQ = math.lengthsq(targetPos - position[index].Value);
+            if (swarmRotationSpeed <= 5.0f && (attachedToTarget[index] == 1 || math.lengthsq(targetPos - position[index].Value) <= minDistSQ))
+            {
+                attachedToTarget[index] = 1;
+                position[index] = new Position { Value = targetPos };
+
+                if (math.lengthsq(velocity[index].Value) != 0.0f)
+                    velocity[index] = new Velocity { Value = float3.zero };
+            }
+            else
+            {
+                attachedToTarget[index] = 0;
+
+                float rotSpeed = swarmRotationSpeed < minSwarmRotationSpeed ? minSwarmRotationSpeed : swarmRotationSpeed;
+                float3 currVel = velocity[index].Value;
+                float speed = math.length(currVel);
+                float3 newVel;
+                float completion = math.abs(timer) / swarmTime;
+                if(timer < -swarmTime * .33f)
+                    newVel = (1.0f - completion) * currVel + math.lerp(currVel, speed * math.normalize(targetPos - position[index].Value), completion);
+                else
+                    newVel = currVel + math.lerp(currVel, targetPos - position[index].Value, math.exp(rotSpeed * -deltaT));
+
+                float velSQ = math.lengthsq(newVel);
+                if (velSQ < minVel * minVel)
+                    newVel = minVel * math.normalize(newVel);
+                else if (velSQ > maxVel * maxVel)
+                    newVel = maxVel * math.normalize(newVel);
+
+                float3 dir = math.normalize(newVel);
+                float3 up = math.up();
+                float3 right = math.cross(dir, up);
+                up = math.cross(dir, right);
+                float3 newDir = Quaternion.FromToRotation(up, dir) * dir; // get the top of the capsule to face the flying direction
+
+                rotation[index] = new Rotation { Value = Quaternion.LookRotation(newDir, dir) };
+                velocity[index] = new Velocity { Value = newVel };
+            }
 
         }
+    }
+
+    protected override void OnStartRunning()
+    {
+        base.OnStartRunning();
+
+        _timer = Bootstrap.settings._swarmTime;
     }
 
     protected override void OnStopRunning()
@@ -170,18 +214,39 @@ public class SwarmModelSystem : JobComponentSystem
 
         if(_boneWeights.IsCreated)
             _boneWeights.Dispose();
+
+        if (_randomOffsets.IsCreated)
+            _randomOffsets.Dispose();
+        if (_attachedToTarget.IsCreated)
+            _attachedToTarget.Dispose();
+        //if (_positionOffsets.IsCreated)
+        //    _positionOffsets.Dispose();
     }
 
     private void LoadModelFormationData(ColliderGrid grid)
-    {
-        _currentGrid = grid;
-        if (_targetPoints.IsCreated)
-            _targetPoints.Dispose();
+    {        
+        if (_currentGrid != grid)
+        {
+            if (_targetPoints.IsCreated)
+                _targetPoints.Dispose();
 
-        _targetPoints = new NativeArray<float3>(grid.PointList.Count, Allocator.Persistent);
+            if (_randomOffsets.IsCreated)
+                _randomOffsets.Dispose();
+            if (_attachedToTarget.IsCreated)
+                _attachedToTarget.Dispose();
 
-        for (int i = 0; i < grid.PointList.Count; i++)
-            _targetPoints[i] = grid.PointList[i];
+            _targetPoints = new NativeArray<float3>(grid.PointList.Count, Allocator.Persistent);
+            _randomOffsets = new NativeArray<float>(grid.PointList.Count, Allocator.Persistent);
+            _attachedToTarget = new NativeArray<int>(_swarmData.Length, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+
+            for (int i = 0; i < grid.PointList.Count; i++)
+            {
+                _targetPoints[i] = grid.PointList[i];
+                _randomOffsets[i] = Mathf.PerlinNoise(_targetPoints[i].x, _targetPoints[i].y);
+            }
+
+            _currentGrid = grid;
+        }
     }
 
     private void LoadSkinnedModelFormationData(ColliderGrid grid)
@@ -206,12 +271,13 @@ public class SwarmModelSystem : JobComponentSystem
                 int index = boneWeightIndices[i];
                 _boneWeights[i] = weights[index];
             }
+            //get rid of the mesh so it stops rendering without stopping the animator
             grid._skinnedMeshRenderer.sharedMesh = null;
 
             for (int i = 0; i < grid.BoneList.Count; i++)
                 _boneInverseBaseRotations[i] = Quaternion.Inverse(grid.BoneList[i].rotation);
-            
 
+            grid._animator.enabled = true;
         }
         else if(_bonePositions.IsCreated)
         {            
@@ -236,33 +302,52 @@ public class SwarmModelSystem : JobComponentSystem
             _targetIndices.Dispose();
 
         _targetIndices = new NativeArray<int>(_swarmData.Length, Allocator.TempJob);
-
+        //_positionOffsets = new NativeArray<float3>(_swarmData.Length, Allocator.TempJob);
         //TODO work on multiple targets
         //TODO clean this shit up
-        foreach(var entity in GetEntities<GridPoints>())
+        foreach(var entity in GetEntities<TargetModel>())
         {
             var grid = entity.grid;
-            bool isSkinned = grid.IsSkinnedMesh;
+            if (grid != _currentGrid)
+                _timer = Bootstrap.settings._swarmTime;
             
             if (grid.IsSkinnedMesh)
                 LoadSkinnedModelFormationData(grid);
             else
                 LoadModelFormationData(grid);
 
-            int targetNodeCount = _currentGrid.IsSkinnedMesh ? _boneWeights.Length : _targetPoints.Length;
-            int offset = (int)math.ceil((float)targetNodeCount / (float)_swarmData.Length);
-            int count = 0;
-
-            for (int i = 0; i < targetNodeCount; i += offset)
-            {
-                if (count >= _swarmData.Length)
-                    break;
-
-                _targetIndices[count++] = i;
-            }
+            int targetNodeCount = _targetPoints.Length;
+            int indexOffset = (int)math.ceil((float)targetNodeCount / (float)_swarmData.Length);
+            for (int i = 0; i < _swarmData.Length; i++)
+                _targetIndices[i] = (i * indexOffset) % targetNodeCount;
 
             if (_currentGrid.IsSkinnedMesh)
             {
+                float rotationSpeed = Bootstrap.settings._swarmRotationSpeed;
+                float minDist = 3.0f;
+                float minDistSQ = minDist * minDist;
+                float timedMinDistSQ =  (_timer * _timer) * minDistSQ;
+                _timer -= Time.deltaTime;
+
+                if (timedMinDistSQ > 200.0f) timedMinDistSQ = 200.0f;
+                if (_timer <= 0.0f)
+                {
+                    rotationSpeed = 0.0f;            
+                    timedMinDistSQ = timedMinDistSQ < minDistSQ ? minDistSQ : timedMinDistSQ;
+
+                    if (_timer <= -Bootstrap.settings._swarmTime)
+                    {
+                        _timer = Bootstrap.settings._swarmTime * .5f;
+
+                        for (int i = 0; i < _swarmData.Length; i++)
+                            _attachedToTarget[i] = 0;
+                    }
+                }
+                else
+                {                    
+                    rotationSpeed *= (_timer / Bootstrap.settings._swarmTime);
+                }
+
                 return new SwarmSkinnedModelJob
                 {
                     Length = _swarmData.Length,
@@ -270,6 +355,8 @@ public class SwarmModelSystem : JobComponentSystem
                     rotation = _swarmData.rotation,
                     velocity = _swarmData.velocity,
                     targetIndices = _targetIndices,
+                    attachedToTarget = _attachedToTarget,
+                    randomOffsets = _randomOffsets,
                     cellPosition = _targetPoints,
                     boneGridCells = _boneWeights,
                     bonePositions = _bonePositions,
@@ -279,8 +366,16 @@ public class SwarmModelSystem : JobComponentSystem
                     rootScale = grid.gameObject.transform.localScale,
                     minVel = Bootstrap.settings._minVel,
                     maxVel = Bootstrap.settings._maxVel,
-                    deltaT = Time.deltaTime
-                }.Schedule(_swarmData.Length, 32, inputDeps);
+                    minDistSQ = timedMinDistSQ,
+                    swarmTimeOffsetFactor = Bootstrap.settings._swarmOffsetTimeFactor,
+                    swarmOffsetDistance = Bootstrap.settings._swarmOffsetDistance,
+                    swarmRotationSpeed = rotationSpeed,
+                    minSwarmRotationSpeed = Bootstrap.settings._minSwarmRotationSpeed,
+                    swarmTime = Bootstrap.settings._swarmTime,
+                    timer = _timer,
+                    deltaT = Time.deltaTime,
+                    time = Time.time
+                }.Schedule(_swarmData.Length, 128, inputDeps);
             }
             else
             {
@@ -296,9 +391,9 @@ public class SwarmModelSystem : JobComponentSystem
                     rootRotation = grid.rootArmature.rotation,
                     rootScale = grid.gameObject.transform.localScale,
                     minVel = Bootstrap.settings._minVel,
-                    maxVel = Bootstrap.settings._maxVel,
+                    maxVel = Bootstrap.settings._maxVel,                    
                     deltaT = Time.deltaTime
-                }.Schedule(_swarmData.Length, 32, inputDeps);
+                }.Schedule(_swarmData.Length, 128, inputDeps);
             }
         }
 

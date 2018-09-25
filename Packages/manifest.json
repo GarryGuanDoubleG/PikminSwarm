@@ -2,9 +2,9 @@
   "dependencies": {
     "com.unity.ads": "2.0.8",
     "com.unity.analytics": "2.0.16",
-    "com.unity.collections": "0.0.9-preview.5",
-    "com.unity.entities": "0.0.12-preview.13",
-    "com.unity.jobs": "0.0.7-preview.3",
+    "com.unity.collections": "0.0.9-preview.6",
+    "com.unity.entities": "0.0.12-preview.15",
+    "com.unity.jobs": "0.0.7-preview.4",
     "com.unity.package-manager-ui": "1.9.11",
     "com.unity.purchasing": "2.0.3",
     "com.unity.render-pipelines.high-definition": "3.0.0-preview",

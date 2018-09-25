@@ -57,10 +57,9 @@ public class SwarmSystem : ComponentSystem
             var entityArr = _swarmFlockPikmin.entityArray;
             for(int i = 0; i < _swarmFlockPikmin.Length; i++)
             {
-                PostUpdateCommands.AddComponent<SwarmModelFormation>(entityArr[i], new SwarmModelFormation());
                 PostUpdateCommands.RemoveComponent(entityArr[i], typeof(SwarmFlockFormation));
+                PostUpdateCommands.AddComponent<SwarmModelFormation>(entityArr[i], new SwarmModelFormation());                
             }
-
             _state = State.Model;
         }
 

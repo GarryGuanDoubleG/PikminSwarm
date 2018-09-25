@@ -24,10 +24,14 @@ public class Settings : MonoBehaviour {
 
     [Header("Boid Swarm Values")]
     public float _swarmRotationSpeed;
+    public float _minSwarmRotationSpeed;
     public float _neighborDist;
     public float _minVel;
     public float _maxVel;
 
     [Header("Boid Swarm Model Formation")]
+    public float _swarmOffsetTimeFactor;
+    public float _swarmOffsetDistance;
+    public float _swarmTime;
     public float _swarmModelStartDelay;
 }

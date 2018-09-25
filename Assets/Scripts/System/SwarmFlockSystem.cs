@@ -58,14 +58,14 @@ public class SwarmFlockSystem : JobComponentSystem
             float3 separation = float3.zero;
 
             int neighborCount = 1;
-
-            for(int i = 0; i < Length; i++)
+            int count = 10;
+            for (int i = index; i < Length && (i - index < count); i++)
             {
                 if (i == index) continue;
                 float3 diff = pikPosition[index].Value - pikPosition[i].Value;
                 float dist = math.length(diff);
 
-                if(dist <= neighborDist)
+                if (dist <= neighborDist)
                 {
                     alignment += pikVelocity[i].Value;
                     cohesion += pikPosition[i].Value;

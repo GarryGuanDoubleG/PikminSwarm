@@ -27,6 +27,8 @@ public class ColliderGridGenerator : MonoBehaviour
     public Vector3 _gridCellSize;
     private List<ColliderCell> _cellList;
 
+    List<Vector3> _bonePoint;
+
     List<Vector3> _pointsList;
     public List<Vector3> PointList
     {
@@ -42,6 +44,7 @@ public class ColliderGridGenerator : MonoBehaviour
     }
 
     public int _maxHitCount;
+    public bool _showVertices;
     public bool _isSkinnedMesh;
     public bool _generateGrid;
     public bool _showPoints;
@@ -77,11 +80,16 @@ public class ColliderGridGenerator : MonoBehaviour
         _connectedBoneMap = new Dictionary<Transform, List<int>>();
         _boneWeightIndices = new List<int>();
 
+        if(_showVertices)
+        {
+            ShowVertices();
+        }
         if (_isSkinnedMesh)
         {
             GetBonesList(_rootArmature.transform);
             //GetConnectedBones(_rootArmature.transform);
         }
+
 
         if (_generateGrid)
         {
@@ -98,7 +106,7 @@ public class ColliderGridGenerator : MonoBehaviour
         _meshGridData = new MeshGridData();
         _meshGridData.isRigged = _isSkinnedMesh;
         _meshGridData.cellSize = _gridCellSize;
-        _meshGridData.points = _pointsList;
+        _meshGridData.points = _isSkinnedMesh ? _bonePoint : _pointsList;
         _meshGridData.boneWeightIndices = _isSkinnedMesh ? _boneWeightIndices : null;
 
         string json = JsonUtility.ToJson(_meshGridData);
@@ -116,18 +124,6 @@ public class ColliderGridGenerator : MonoBehaviour
             _boneList.Add(bone);
             _boneIndexMap.Add(bone, i++);
         }
-
-        //int childCount = transform.childCount;
-        //for(int i = 0; i < childCount; i++)
-        //{
-        //    Transform child = transform.GetChild(i);
-        //    if (child != null)
-        //    {
-        //        _boneIndexMap.Add(child, _boneList.Count);
-        //        _boneList.Add(child);
-        //        GetBonesList(child);
-        //    }
-        //}
     }
 
     //parse bone names too see if they match
@@ -140,60 +136,6 @@ public class ColliderGridGenerator : MonoBehaviour
         return inputName.Split(splitArr);
     }
 
-    //compare bone names for all matching tokens and same parent
-    void GetConnectedBones(Transform currBone)
-    {
-        foreach(Transform bone in _boneList)
-        {
-            string[] tokens = GetTokens(bone);
-            List<int> indices = new List<int>();
-            Transform parent = bone.parent;
-            Vector3 pos = bone.position;
-
-            float minDist1 = 9999,
-                    minDist2 = 9999,
-                    minDist3 = 9999;
-            Transform bone1 = null,
-                      bone2 = null,
-                      bone3 = null;
-            
-            foreach(Transform other in _boneList)
-            {
-                if (other != bone)
-                {
-                    float dist = Vector3.Distance(other.position, pos);
-                    if(dist < minDist1)
-                    {
-                        bone3 = bone2;
-                        bone2 = bone1;
-                        bone1 = other;    
-                        
-                        minDist3 = minDist2;
-                        minDist2 = minDist1;
-                        minDist1 = dist;
-                    }
-                    else if(dist < minDist2)
-                    {
-                        bone3 = bone2;
-                        bone2 = other;
-                        minDist3 = minDist2;
-                        minDist2 = dist;
-                    }
-                    else if(dist < minDist3)
-                    {
-                        bone3 = other;
-                        minDist3 = dist;
-                    }
-                }
-            }
-            indices.Add(_boneIndexMap[bone1]);
-            indices.Add(_boneIndexMap[bone2]);
-            indices.Add(_boneIndexMap[bone3]);
-
-            _connectedBoneMap.Add(bone, indices);
-        }
-    }
-    
     //TODO make another option to use octrees
     void GenerateGrid()
     {
@@ -246,6 +188,22 @@ public class ColliderGridGenerator : MonoBehaviour
         return closest;
     }
     
+    void ShowVertices()
+    {
+        Mesh mesh = _skinnedMeshRenderer.sharedMesh;
+        Vector3[] vertices = mesh.vertices;
+        Vector3 scale = _skinnedMeshRenderer.transform.localScale;
+
+        GameObject[] gameObj = new GameObject[vertices.Length];
+        int i = 0;
+        foreach (Vector3 vertex in vertices)
+        {
+            Vector3 temp = Vector3.Scale(vertex, scale);
+            gameObj[i++] = Instantiate(_gridCellObject.gameObject, temp, Quaternion.identity);
+        }
+
+    }
+
     //find which bones to attach each point to
     void FindBoneWeightsFromPoint()
     {
@@ -253,6 +211,8 @@ public class ColliderGridGenerator : MonoBehaviour
         Vector3 [] vertices = mesh.vertices;
         BoneWeight[] boneWeights = mesh.boneWeights;
         Vector3 scale = _skinnedMeshRenderer.transform.localScale;
+        _bonePoint = new List<Vector3>(_pointsList.Count);
+
         for (int i = 0; i < _pointsList.Count; i++)
         {
             Vector3 point = _pointsList[i];
@@ -275,7 +235,7 @@ public class ColliderGridGenerator : MonoBehaviour
             weighedPoint += bW.weight2 * _boneList[bW.boneIndex2].position;
             weighedPoint += bW.weight3 * _boneList[bW.boneIndex3].position;
 
-            _pointsList[i] = point - weighedPoint;
+            _bonePoint.Add(point - weighedPoint);
             _boneWeightIndices.Add(index);
         }
     }

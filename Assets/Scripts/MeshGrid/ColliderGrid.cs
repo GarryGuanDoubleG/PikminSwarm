@@ -9,6 +9,7 @@ public class ColliderGrid : MonoBehaviour
     public GameObject rootObject;
     public GameObject rootMesh;
     public Transform rootArmature;
+    public Animator _animator;
     private bool _isSkinnedMesh;
     public bool IsSkinnedMesh{ get { return _isSkinnedMesh; }}
     public SkinnedMeshRenderer _skinnedMeshRenderer;
@@ -47,6 +48,7 @@ public class ColliderGrid : MonoBehaviour
     {
         _boneList = new List<Transform>();
         //GetBoneList(rootArmature);
+        _animator.enabled = false;
         GetBoneList();
     }
 
