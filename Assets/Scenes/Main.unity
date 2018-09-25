@@ -376,7 +376,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c46741db88011c4e8a912fce2f8d71c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _spawnCount: 40000
+  _spawnCount: 15000
   _spawnScale:
     x: 0.5
     y: 0.5
@@ -398,7 +398,7 @@ MonoBehaviour:
   _swarmOffsetTimeFactor: 2
   _swarmOffsetDistance: 7.5
   _swarmTime: 10
-  _swarmModelStartDelay: 0.5
+  _swarmModelStartDelay: 1.5
 --- !u!4 &1175350511
 Transform:
   m_ObjectHideFlags: 0

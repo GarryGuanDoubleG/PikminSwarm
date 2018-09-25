@@ -163,7 +163,7 @@ public class SwarmModelSystem : JobComponentSystem
                 float speed = math.length(currVel);
                 float3 newVel;
                 float completion = math.abs(timer) / swarmTime;
-                if(timer < -swarmTime * .33f)
+                if(timer < 0)
                     newVel = (1.0f - completion) * currVel + math.lerp(currVel, speed * math.normalize(targetPos - position[index].Value), completion);
                 else
                     newVel = currVel + math.lerp(currVel, targetPos - position[index].Value, math.exp(rotSpeed * -deltaT));
@@ -217,10 +217,10 @@ public class SwarmModelSystem : JobComponentSystem
 
         if (_randomOffsets.IsCreated)
             _randomOffsets.Dispose();
+
         if (_attachedToTarget.IsCreated)
             _attachedToTarget.Dispose();
-        //if (_positionOffsets.IsCreated)
-        //    _positionOffsets.Dispose();
+
     }
 
     private void LoadModelFormationData(ColliderGrid grid)
