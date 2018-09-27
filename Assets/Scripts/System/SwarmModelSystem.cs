@@ -115,6 +115,37 @@ public class SwarmModelSystem : JobComponentSystem
         public ComponentDataArray<Rotation> rotation;
         public ComponentDataArray<Velocity> velocity;
 
+        public float3 GetNewVelocity(float3 targetPos, int index)
+        {
+            float rotSpeed = swarmRotationSpeed < minSwarmRotationSpeed ? minSwarmRotationSpeed : swarmRotationSpeed;
+            float3 currVel = velocity[index].Value;
+            float speed = math.length(currVel);
+            float3 newVel;
+            float completion = math.abs(timer) / swarmTime;
+            if (timer < 0)
+                newVel = (1.0f - completion) * currVel + math.lerp(currVel, speed * math.normalize(targetPos - position[index].Value), completion);
+            else
+                newVel = currVel + math.lerp(currVel, targetPos - position[index].Value, math.exp(rotSpeed * -deltaT));
+
+            float velSQ = math.lengthsq(newVel);
+            if (velSQ < minVel * minVel)
+                newVel = minVel * math.normalize(newVel);
+            else if (velSQ > maxVel * maxVel)
+                newVel = maxVel * math.normalize(newVel);
+
+            return newVel;
+        }
+
+        public void GetNewRotation(float3 dir, out Quaternion newRot)
+        {
+            float3 up = math.up();
+            float3 right = math.cross(dir, up);
+            up = math.cross(dir, right);
+            float3 newDir = Quaternion.FromToRotation(up, dir) * dir; // get the top of the capsule to face the flying direction
+
+            newRot =  Quaternion.LookRotation(newDir, dir);
+        }
+
         public void Execute(int index)
         {
             int targetIndex = targetIndices[index];
@@ -146,7 +177,7 @@ public class SwarmModelSystem : JobComponentSystem
 
             int attached = attachedToTarget[index];
             float distanceSQ = math.lengthsq(targetPos - position[index].Value);
-            if (swarmRotationSpeed <= 5.0f && (attachedToTarget[index] == 1 || math.lengthsq(targetPos - position[index].Value) <= minDistSQ))
+            if (swarmRotationSpeed <= 0.0f && (attachedToTarget[index] == 1 || math.lengthsq(targetPos - position[index].Value) <= minDistSQ))
             {
                 attachedToTarget[index] = 1;
                 position[index] = new Position { Value = targetPos };
@@ -158,6 +189,7 @@ public class SwarmModelSystem : JobComponentSystem
             {
                 attachedToTarget[index] = 0;
 
+<<<<<<< Updated upstream
                 float rotSpeed = swarmRotationSpeed < minSwarmRotationSpeed ? minSwarmRotationSpeed : swarmRotationSpeed;
                 float3 currVel = velocity[index].Value;
                 float speed = math.length(currVel);
@@ -181,6 +213,12 @@ public class SwarmModelSystem : JobComponentSystem
                 float3 newDir = Quaternion.FromToRotation(up, dir) * dir; // get the top of the capsule to face the flying direction
 
                 rotation[index] = new Rotation { Value = Quaternion.LookRotation(newDir, dir) };
+=======
+                float3 newVel = GetNewVelocity(targetPos, index);
+                Quaternion newRot;
+                GetNewRotation(math.normalize(newVel), out newRot);
+                rotation[index] = new Rotation { Value = newRot };            
+>>>>>>> Stashed changes
                 velocity[index] = new Velocity { Value = newVel };
             }
 
@@ -324,16 +362,18 @@ public class SwarmModelSystem : JobComponentSystem
             if (_currentGrid.IsSkinnedMesh)
             {
                 float rotationSpeed = Bootstrap.settings._swarmRotationSpeed;
-                float minDist = 3.0f;
-                float minDistSQ = minDist * minDist;
-                float timedMinDistSQ =  (_timer * _timer) * minDistSQ;
+                float minDist = _timer * _timer;                
+                float timedMinDistSQ = minDist * minDist;
+
+                if (timedMinDistSQ > 150.0f)
+                    timedMinDistSQ = 150.0f;
+
                 _timer -= Time.deltaTime;
 
-                if (timedMinDistSQ > 200.0f) timedMinDistSQ = 200.0f;
+                //if (timedMinDistSQ > 200.0f) timedMinDistSQ = 200.0f;
                 if (_timer <= 0.0f)
                 {
-                    rotationSpeed = 0.0f;            
-                    timedMinDistSQ = timedMinDistSQ < minDistSQ ? minDistSQ : timedMinDistSQ;
+                    rotationSpeed = 0.0f;
 
                     if (_timer <= -Bootstrap.settings._swarmTime)
                     {
@@ -375,7 +415,7 @@ public class SwarmModelSystem : JobComponentSystem
                     timer = _timer,
                     deltaT = Time.deltaTime,
                     time = Time.time
-                }.Schedule(_swarmData.Length, 128, inputDeps);
+                }.Schedule(_swarmData.Length, 1024, inputDeps);
             }
             else
             {
@@ -393,7 +433,7 @@ public class SwarmModelSystem : JobComponentSystem
                     minVel = Bootstrap.settings._minVel,
                     maxVel = Bootstrap.settings._maxVel,                    
                     deltaT = Time.deltaTime
-                }.Schedule(_swarmData.Length, 128, inputDeps);
+                }.Schedule(_swarmData.Length, 1024, inputDeps);
             }
         }
 
