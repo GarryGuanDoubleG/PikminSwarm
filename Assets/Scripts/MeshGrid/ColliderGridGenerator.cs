@@ -95,7 +95,7 @@ public class ColliderGridGenerator : MonoBehaviour
         {
             GenerateGrid();
 
-            if (_isSkinnedMesh) FindBoneWeightsFromPoint();
+            if (_isSkinnedMesh) FindBoneWeightsFromPointList();
             if (_writeToFile) WriteToFile();
             if(_showPoints) SpawnColliders();
         }
@@ -159,7 +159,7 @@ public class ColliderGridGenerator : MonoBehaviour
                         pos += offset;
 
                         if (IsInsideTest(pos, Vector3.forward))
-                            PointList.Add(pos);
+                            _pointsList.Add(pos);
                     }
                 }
             }
@@ -201,11 +201,10 @@ public class ColliderGridGenerator : MonoBehaviour
             Vector3 temp = Vector3.Scale(vertex, scale);
             gameObj[i++] = Instantiate(_gridCellObject.gameObject, temp, Quaternion.identity);
         }
-
     }
 
     //find which bones to attach each point to
-    void FindBoneWeightsFromPoint()
+    void FindBoneWeightsFromPointList()
     {
         Mesh mesh = _skinnedMeshRenderer.sharedMesh;
         Vector3 [] vertices = mesh.vertices;
@@ -283,7 +282,7 @@ public class ColliderGridGenerator : MonoBehaviour
     {
         GameObject[] gameObjArr = new GameObject[PointList.Count];
         int count = 0;
-        foreach (var point in PointList)
+        foreach (var point in _pointsList)
         {
             GameObject cell = Instantiate(_gridCellObject.gameObject, _rootObject.transform);
             gameObjArr[count] = cell;
@@ -304,7 +303,7 @@ public class ColliderGridGenerator : MonoBehaviour
             if (IsInsideTest(point, -Vector3.forward))
                 checkPointList.Add(point);
         }
-        PointList = checkPointList;
+        _pointsList = checkPointList;
     }
 
     // Update is called once per frame

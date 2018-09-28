@@ -188,37 +188,11 @@ public class SwarmModelSystem : JobComponentSystem
             else
             {
                 attachedToTarget[index] = 0;
-
-<<<<<<< Updated upstream
-                float rotSpeed = swarmRotationSpeed < minSwarmRotationSpeed ? minSwarmRotationSpeed : swarmRotationSpeed;
-                float3 currVel = velocity[index].Value;
-                float speed = math.length(currVel);
-                float3 newVel;
-                float completion = math.abs(timer) / swarmTime;
-                if(timer < -swarmTime * .33f)
-                    newVel = (1.0f - completion) * currVel + math.lerp(currVel, speed * math.normalize(targetPos - position[index].Value), completion);
-                else
-                    newVel = currVel + math.lerp(currVel, targetPos - position[index].Value, math.exp(rotSpeed * -deltaT));
-
-                float velSQ = math.lengthsq(newVel);
-                if (velSQ < minVel * minVel)
-                    newVel = minVel * math.normalize(newVel);
-                else if (velSQ > maxVel * maxVel)
-                    newVel = maxVel * math.normalize(newVel);
-
-                float3 dir = math.normalize(newVel);
-                float3 up = math.up();
-                float3 right = math.cross(dir, up);
-                up = math.cross(dir, right);
-                float3 newDir = Quaternion.FromToRotation(up, dir) * dir; // get the top of the capsule to face the flying direction
-
-                rotation[index] = new Rotation { Value = Quaternion.LookRotation(newDir, dir) };
-=======
-                float3 newVel = GetNewVelocity(targetPos, index);
                 Quaternion newRot;
+                float3 newVel = GetNewVelocity(targetPos, index);
                 GetNewRotation(math.normalize(newVel), out newRot);
-                rotation[index] = new Rotation { Value = newRot };            
->>>>>>> Stashed changes
+
+                rotation[index] = new Rotation { Value = newRot };
                 velocity[index] = new Velocity { Value = newVel };
             }
 
@@ -314,8 +288,6 @@ public class SwarmModelSystem : JobComponentSystem
 
             for (int i = 0; i < grid.BoneList.Count; i++)
                 _boneInverseBaseRotations[i] = Quaternion.Inverse(grid.BoneList[i].rotation);
-
-            grid._animator.enabled = true;
         }
         else if(_bonePositions.IsCreated)
         {            
@@ -358,6 +330,15 @@ public class SwarmModelSystem : JobComponentSystem
             int indexOffset = (int)math.ceil((float)targetNodeCount / (float)_swarmData.Length);
             for (int i = 0; i < _swarmData.Length; i++)
                 _targetIndices[i] = (i * indexOffset) % targetNodeCount;
+
+            bool assembled = true;
+            for (int i = 0; i < _attachedToTarget.Length; i++)
+            {
+                if (_attachedToTarget[i] != 1)
+                    assembled = false;
+            }
+            if (assembled)
+                grid._animator.enabled = true;
 
             if (_currentGrid.IsSkinnedMesh)
             {
